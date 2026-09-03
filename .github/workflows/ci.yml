@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet restore RootlessWM.sln
+      - run: dotnet format RootlessWM.sln --verify-no-changes --no-restore
+      - run: dotnet test RootlessWM.sln --configuration Release --no-restore

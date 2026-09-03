@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <NoWarn>$(NoWarn);NU1701</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="SkiaSharp.Views.WindowsForms" Version="2.88.9" />
+    <PackageReference Include="Tomlyn" Version="2.10.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="RootlessWM.Tests" />
+  </ItemGroup>
+</Project>
