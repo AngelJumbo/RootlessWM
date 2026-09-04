@@ -43,6 +43,7 @@ internal sealed class WmApplication
     private readonly LayoutState _layoutState = new();
     private readonly Dictionary<nint, int> _eligibilityRecheckAttempts = [];
     private readonly HashSet<nint> _workspaceHiddenHandles = [];
+    private readonly HashSet<nint> _topmostHandles = [];
     private Action<nint>? _scheduleEligibilityRecheck;
     private RootlessWMSettings _settings = RootlessWMSettings.Default;
     private WorkspaceBarController? _workspaceBar;
@@ -799,6 +800,7 @@ internal sealed class WmApplication
     {
         var disabled = _managementState.Disable();
         SaveWorkspaceState();
+        ClearFloatingZOrder();
         RunUntileMode();
         _fullscreenState.Clear();
         _workspaceBar?.SetVisible(false);
@@ -837,6 +839,7 @@ internal sealed class WmApplication
         try
         {
             _ = TileAllMonitors(GetEligibleTiledHandles());
+            SynchronizeFloatingZOrder();
         }
         catch (Exception exception) when (exception is Win32Exception or ArgumentOutOfRangeException or InvalidOperationException)
         {
@@ -846,6 +849,62 @@ internal sealed class WmApplication
                 exception = exception.GetType().Name
             });
         }
+    }
+
+    // A one-shot raise is not enough: activating a tiled window puts it above the float again.
+    // Marking floats as topmost keeps them above tiled windows until they are unfloated.
+    private void SynchronizeFloatingZOrder()
+    {
+        foreach (var handle in _tilingState.FloatingHandles)
+        {
+            if (_topmostHandles.Contains(handle))
+            {
+                continue;
+            }
+
+            if (SetTopmost(handle, true))
+            {
+                _ = _topmostHandles.Add(handle);
+            }
+        }
+
+        foreach (var handle in _topmostHandles.ToArray())
+        {
+            if (_tilingState.FloatingHandles.Contains(handle))
+            {
+                continue;
+            }
+
+            _ = SetTopmost(handle, false);
+            _ = _topmostHandles.Remove(handle);
+        }
+    }
+
+    private void ClearFloatingZOrder()
+    {
+        foreach (var handle in _topmostHandles)
+        {
+            _ = SetTopmost(handle, false);
+        }
+
+        _topmostHandles.Clear();
+    }
+
+    private bool SetTopmost(nint handle, bool topmost)
+    {
+        if (!_windowInspector.TryInspect(handle, out _))
+        {
+            return false;
+        }
+
+        return NativeMethods.SetWindowPos(
+            handle,
+            topmost ? NativeMethods.HwndTopmost : NativeMethods.HwndNoTopmost,
+            0,
+            0,
+            0,
+            0,
+            NativeMethods.SwpNoMove | NativeMethods.SwpNoSize | NativeMethods.SwpNoActivate);
     }
 
     private IReadOnlyList<TilingOperationResult> TileAllMonitors(IReadOnlyList<nint> orderedHandles)

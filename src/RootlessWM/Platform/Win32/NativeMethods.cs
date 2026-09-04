@@ -38,6 +38,8 @@ internal static class NativeMethods
     internal const int SwRestore = 9;
     internal const int SwHide = 0;
     internal const int SwShow = 5;
+    internal static readonly nint HwndTopmost = new(-1);
+    internal static readonly nint HwndNoTopmost = new(-2);
     internal const uint SwpNoSize = 0x0001;
     internal const uint SwpNoMove = 0x0002;
     internal const uint SwpNoZOrder = 0x0004;
