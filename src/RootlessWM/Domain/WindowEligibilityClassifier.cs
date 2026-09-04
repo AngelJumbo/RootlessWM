@@ -12,6 +12,7 @@ public sealed class WindowEligibilityClassifier(WindowEligibilityOptions? option
         "Shell_SecondaryTrayWnd",
         "WorkerW",
         "#32768",
+        "WindowsScreenSaverClass",
         "Microsoft.UI.Content.PopupWindowSiteBridge"
     };
 
@@ -19,7 +20,8 @@ public sealed class WindowEligibilityClassifier(WindowEligibilityOptions? option
     {
         "TextInputHost",
         "SearchHost",
-        "StartMenuExperienceHost"
+        "StartMenuExperienceHost",
+        "LockApp"
     };
 
     private readonly WindowEligibilityOptions _options = options ?? new WindowEligibilityOptions();

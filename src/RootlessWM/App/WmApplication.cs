@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Text.Json;
+using Microsoft.Win32;
 using RootlessWM.Domain;
 using RootlessWM.Platform.Win32;
 
@@ -45,6 +46,7 @@ internal sealed class WmApplication
     private Action<nint>? _scheduleEligibilityRecheck;
     private RootlessWMSettings _settings = RootlessWMSettings.Default;
     private WorkspaceBarController? _workspaceBar;
+    private bool _sessionLocked;
 
     public WmApplication()
     {
@@ -316,6 +318,7 @@ internal sealed class WmApplication
             trayController.SetManagementEnabled(_managementState.IsEnabled);
             UpdateStatus(statusController);
             _log.Info("management_started", new { hotkeyModifier = "Alt+Shift" });
+            SystemEvents.SessionSwitch += OnSessionSwitch;
             eventSource.RunMessageLoop((messageId, hotkeyIdentifier) =>
             {
                 if (hotkeySource?.TryGetCommand(messageId, hotkeyIdentifier, out var command) == true)
@@ -324,7 +327,8 @@ internal sealed class WmApplication
                     UpdateStatus(trayController);
                 }
                 else if (messageId is NativeMethods.WmDisplayChange or NativeMethods.WmSettingChange
-                    && _managementState.IsEnabled)
+                    && _managementState.IsEnabled
+                    && !_sessionLocked)
                 {
                     RetilePrimaryWindows();
                     UpdateStatus(trayController);
@@ -333,6 +337,7 @@ internal sealed class WmApplication
         }
         finally
         {
+            SystemEvents.SessionSwitch -= OnSessionSwitch;
             _scheduleEligibilityRecheck = null;
             Console.CancelKeyPress -= cancelHandler;
             hotkeySource?.Dispose();
@@ -385,6 +390,36 @@ internal sealed class WmApplication
                 _monitorCatalog.GetWorkAreas(),
                 _workspaceState.GetCurrentWorkspace,
                 GetLayoutModeForMonitor);
+        }
+
+        void OnSessionSwitch(object sender, SessionSwitchEventArgs eventArgs)
+        {
+            if (eventArgs.Reason == SessionSwitchReason.SessionLock)
+            {
+                _sessionLocked = true;
+                workspaceBar.SetVisible(false);
+                _log.Info("session_locked");
+                return;
+            }
+
+            if (eventArgs.Reason != SessionSwitchReason.SessionUnlock)
+            {
+                return;
+            }
+
+            _sessionLocked = false;
+            _log.Info("session_unlocked");
+            // Do not reseed the tracker here: windows hidden for other workspaces are not
+            // WS_VISIBLE, so re-inspecting them would misclassify them as NotVisible and
+            // drop them from tiling/workspace state.
+            ApplyWorkspaceVisibility();
+            if (_managementState.IsEnabled)
+            {
+                RetilePrimaryWindows();
+            }
+
+            workspaceBar.SetVisible(true);
+            UpdateStatus(statusController);
         }
     }
 
@@ -1094,6 +1129,14 @@ internal sealed class WmApplication
     {
         try
         {
+            // While the workstation is locked the desktop switches to the secure desktop;
+            // any retile/placement here fights the lock screen and corrupts window bounds.
+            // Events fired during lock are discarded; a full resync happens on unlock.
+            if (_sessionLocked)
+            {
+                return;
+            }
+
             if (windowEvent.Kind == WindowEventKind.Destroyed)
             {
                 _ = _workspaceHiddenHandles.Remove(windowEvent.Handle);
