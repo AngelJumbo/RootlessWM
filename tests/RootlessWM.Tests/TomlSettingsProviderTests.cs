@@ -131,6 +131,43 @@ public sealed class TomlSettingsProviderTests
     }
 
     [Fact]
+    public void Load_RunnerConfig_MapsConfiguredValuesAndHotkey()
+    {
+        var path = Path.Combine(CreateTempDir(), "settings.toml");
+        File.WriteAllText(path, """
+            [runner]
+            enabled = true
+            max-results = 12
+            sources = ["start-menu", "app-paths"]
+
+            [runner.window]
+            position = "top-center"
+            width = 800
+            max-height = 600
+
+            [runner.style]
+            background = "#123456"
+
+            [runner.input]
+            prompt = "run"
+
+            [Hotkeys]
+            OpenRunner = "Alt+Space"
+            """);
+
+        var settings = new TomlSettingsProvider(path).Load();
+
+        Assert.True(settings.Runner!.Enabled);
+        Assert.Equal(12, settings.Runner.MaxResults);
+        Assert.Equal("top-center", settings.Runner.Window.Position);
+        Assert.Equal(800, settings.Runner.Window.Width);
+        Assert.Equal(600, settings.Runner.Window.MaxHeight);
+        Assert.Equal("#123456", settings.Runner.Style.Background);
+        Assert.Equal("run", settings.Runner.Input.Prompt);
+        Assert.Equal("Alt+Space", settings.Hotkeys!["OpenRunner"]);
+    }
+
+    [Fact]
     public void Load_InvalidToggleExplorerBehaviour_Throws()
     {
         var path = Path.Combine(CreateTempDir(), "settings.toml");

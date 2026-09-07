@@ -158,7 +158,56 @@ padding = { left = 4, right = 4 }
 # interval-ms = 5000
 # color = "#a6e3a1"
 
+# Built-in app runner configuration.
+# This is the first integration point for a rofi-like shell launcher that searches
+# installed apps and executable paths without requiring per-entry config.
+[runner]
+enabled = true
+max-results = 8
+matching = "fuzzy"
+sources = ["start-menu", "app-paths", "path"]
+
+[runner.window]
+position = "top-center"
+offset-x = 0
+offset-y = 96
+width = 720
+max-height = 560
+
+[runner.style]
+# Runner colors accept #RRGGBB and #RRGGBBAA; AA is opacity (00 transparent, FF opaque).
+background = "#1e1e2eeF"
+color = "#cdd6f4"
+border-color = "#45475aCC"
+border-width = 1
+radius = 6
+font-family = "Cascadia Mono"
+font-size = 12
+
+[runner.input]
+prompt = "run"
+background = "#313244F2"
+color = "#cdd6f4"
+placeholder-color = "#6c7086"
+height = 36
+
+[runner.results]
+row-height = 40
+spacing = 4
+background = "#1e1e2eCC"
+color = "#cdd6f4"
+selected-background = "#cba6f7F2"
+selected-color = "#1e1e2e"
+secondary-color = "#a6adc8"
+
+[runner.icons]
+# Draw the associated Windows icon for each result.
+visible = true
+size = 24
+padding = 8
+
 [Hotkeys]
+OpenRunner = "Alt+Space"
 PromoteToMaster = "Alt+Shift+M"
 FocusNext = "Alt+J"
 FocusPrevious = "Alt+K"

@@ -68,6 +68,28 @@ public sealed class RootlessWMSettingsTests
     }
 
     [Fact]
+    public void Constructor_Runner_PreservesConfiguredValues()
+    {
+        var settings = new RootlessWMSettings(
+            0.55,
+            0,
+            0,
+            Runner: new RunnerSettings(
+                Enabled: true,
+                MaxResults: 12,
+                Window: new RunnerWindowSettings(Position: "top-center", Width: 800, MaxHeight: 600),
+                Style: new RunnerStyleSettings(Background: "#123456"),
+                Input: new RunnerInputSettings(Prompt: "run")));
+
+        Assert.True(settings.Runner!.Enabled);
+        Assert.Equal(12, settings.Runner.MaxResults);
+        Assert.Equal("top-center", settings.Runner.Window.Position);
+        Assert.Equal(800, settings.Runner.Window.Width);
+        Assert.Equal("#123456", settings.Runner.Style.Background);
+        Assert.Equal("run", settings.Runner.Input.Prompt);
+    }
+
+    [Fact]
     public void Default_ToggleExplorerBehaviour_HidesTaskbarOnly()
     {
         Assert.Equal(ToggleExplorerBehaviour.TaskbarOnly, RootlessWMSettings.Default.ToggleExplorerBehaviour);

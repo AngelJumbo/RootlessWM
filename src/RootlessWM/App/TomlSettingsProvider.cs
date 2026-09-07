@@ -52,13 +52,116 @@ internal sealed class TomlSettingsProvider
             GetString(table, "Layout") ?? "MasterLeft",
             (int)(GetLong(table, "MasterCount") ?? 1),
             MapWorkspaceBar(GetTable(table, "StatusBar")),
-            MapToggleExplorerBehaviour(GetString(table, "ToggleExplorerBehaviour") ?? "TaskbarOnly"));
+            MapToggleExplorerBehaviour(GetString(table, "ToggleExplorerBehaviour") ?? "TaskbarOnly"),
+            MapRunner(GetTable(table, "Runner")));
     }
 
     private static ToggleExplorerBehaviour MapToggleExplorerBehaviour(string value)
         => Enum.TryParse<ToggleExplorerBehaviour>(value, ignoreCase: true, out var behaviour)
             ? behaviour
             : throw new ArgumentOutOfRangeException(nameof(RootlessWMSettings.ToggleExplorerBehaviour), value, "The toggle explorer behaviour is not supported.");
+
+    private static RunnerSettings? MapRunner(TomlTable? table)
+    {
+        if (table is null)
+        {
+            return null;
+        }
+
+        return new RunnerSettings(
+            GetBool(table, "Enabled") ?? true,
+            (int)(GetLong(table, "MaxResults") ?? 8),
+            GetString(table, "Matching") ?? "fuzzy",
+            GetStringList(table, "Sources"),
+            MapRunnerWindow(GetTable(table, "Window")) ?? RunnerWindowSettings.Default,
+            MapRunnerStyle(GetTable(table, "Style") ?? table) ?? RunnerStyleSettings.Default,
+            MapRunnerInput(GetTable(table, "Input")) ?? RunnerInputSettings.Default,
+            MapRunnerResults(GetTable(table, "Results")) ?? RunnerResultsSettings.Default,
+            MapRunnerIcons(GetTable(table, "Icons")) ?? RunnerIconsSettings.Default);
+    }
+
+    private static RunnerWindowSettings? MapRunnerWindow(TomlTable? table)
+    {
+        if (table is null)
+        {
+            return null;
+        }
+
+        return new RunnerWindowSettings(
+            GetString(table, "Position") ?? "top-center",
+            (int)(GetLong(table, "Width") ?? 720),
+            (int)(GetLong(table, "MaxHeight") ?? 560),
+            (int)(GetLong(table, "OffsetX") ?? 0),
+            (int)(GetLong(table, "OffsetY") ?? 96));
+    }
+
+    private static RunnerStyleSettings? MapRunnerStyle(TomlTable? table)
+    {
+        if (table is null)
+        {
+            return null;
+        }
+
+        return new RunnerStyleSettings(
+            GetString(table, "Background") ?? "#1e1e2e",
+            GetString(table, "Color") ?? "#cdd6f4",
+            GetString(table, "BorderColor") ?? "#45475a",
+            (int)(GetLong(table, "BorderWidth") ?? 1),
+            (int)(GetLong(table, "Radius") ?? 6),
+            GetNullableLong(table, "PaddingTop") ?? GetNullableLong(GetTable(table, "Padding"), "Top"),
+            GetNullableLong(table, "PaddingRight") ?? GetNullableLong(GetTable(table, "Padding"), "Right"),
+            GetNullableLong(table, "PaddingBottom") ?? GetNullableLong(GetTable(table, "Padding"), "Bottom"),
+            GetNullableLong(table, "PaddingLeft") ?? GetNullableLong(GetTable(table, "Padding"), "Left"),
+            GetString(table, "FontFamily") ?? "Cascadia Mono",
+            (float?)(GetDouble(table, "FontSize") ?? 12) ?? 12,
+            GetString(table, "Weight"),
+            GetBool(table, "Italic"));
+    }
+
+    private static RunnerInputSettings? MapRunnerInput(TomlTable? table)
+    {
+        if (table is null)
+        {
+            return null;
+        }
+
+        return new RunnerInputSettings(
+            GetString(table, "Prompt") ?? "run",
+            GetString(table, "Background") ?? "#313244",
+            GetString(table, "Color") ?? "#cdd6f4",
+            GetString(table, "PlaceholderColor") ?? "#6c7086",
+            (int)(GetLong(table, "Height") ?? 36));
+    }
+
+    private static RunnerResultsSettings? MapRunnerResults(TomlTable? table)
+    {
+        if (table is null)
+        {
+            return null;
+        }
+
+        return new RunnerResultsSettings(
+            (int)(GetLong(table, "RowHeight") ?? 40),
+            (int)(GetLong(table, "Spacing") ?? 4),
+            GetString(table, "Background") ?? "#1e1e2e",
+            GetString(table, "Color") ?? "#cdd6f4",
+            GetString(table, "SelectedBackground") ?? "#cba6f7",
+            GetString(table, "SelectedColor") ?? "#1e1e2e",
+            GetString(table, "SecondaryColor") ?? "#a6adc8");
+    }
+
+    private static RunnerIconsSettings? MapRunnerIcons(TomlTable? table)
+    {
+        if (table is null)
+        {
+            return null;
+        }
+
+        return new RunnerIconsSettings(
+            GetBool(table, "Visible") ?? true,
+            (int)(GetLong(table, "Size") ?? 24),
+            (int)(GetLong(table, "Padding") ?? 8));
+    }
 
     private static WorkspaceBarSettings? MapWorkspaceBar(TomlTable? table)
     {

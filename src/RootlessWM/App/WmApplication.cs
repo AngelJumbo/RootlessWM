@@ -47,6 +47,7 @@ internal sealed class WmApplication
     private readonly HashSet<nint> _topmostHandles = [];
     private Action<nint>? _scheduleEligibilityRecheck;
     private RootlessWMSettings _settings = RootlessWMSettings.Default;
+    private RunnerController? _runnerController;
     private WorkspaceBarController? _workspaceBar;
     private bool _sessionLocked;
 
@@ -286,6 +287,8 @@ internal sealed class WmApplication
             GetFocusedWindowTitle,
             _log);
         _workspaceBar = workspaceBar;
+        using var runnerController = new RunnerController(_log);
+        _runnerController = runnerController;
         using var trayController = new TrayController(
             ToggleManagement,
             ReloadSettingsAndHotkeys,
@@ -343,6 +346,7 @@ internal sealed class WmApplication
             _scheduleEligibilityRecheck = null;
             Console.CancelKeyPress -= cancelHandler;
             hotkeySource?.Dispose();
+            _runnerController = null;
             SaveWorkspaceState();
             RunUntileMode();
             _ = _managementState.Disable();
@@ -356,6 +360,7 @@ internal sealed class WmApplication
             hotkeySource = new GlobalHotkeySource();
             var unavailableCommands = hotkeySource.Start(_settings.Hotkeys);
             workspaceBar.ApplyOptions(_settings.ToWorkspaceBarOptions());
+            runnerController.ApplySettings(_settings.Runner);
             if (_managementState.IsEnabled)
             {
                 RetilePrimaryWindows();
@@ -450,6 +455,13 @@ internal sealed class WmApplication
                 RetilePrimaryWindows();
             }
             _log.Info("explorer_visibility_toggled", new { visible = explorerVisible, behaviour = _settings.ToggleExplorerBehaviour.ToString() });
+            return;
+        }
+
+        if (command == TilingCommand.OpenRunner)
+        {
+            _runnerController?.Toggle();
+            _log.Info("runner_hotkey_pressed", new { source = "hotkey", visible = true });
             return;
         }
 

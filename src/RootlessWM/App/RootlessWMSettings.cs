@@ -12,7 +12,8 @@ public sealed record RootlessWMSettings(
     string Layout = "MasterLeft",
     int MasterCount = 1,
     [property: JsonPropertyName("StatusBar")] WorkspaceBarSettings? WorkspaceBar = null,
-    ToggleExplorerBehaviour ToggleExplorerBehaviour = ToggleExplorerBehaviour.TaskbarOnly)
+    ToggleExplorerBehaviour ToggleExplorerBehaviour = ToggleExplorerBehaviour.TaskbarOnly,
+    RunnerSettings? Runner = null)
 {
     public static RootlessWMSettings Default { get; } = new(0.55, 0, 0);
 
@@ -314,3 +315,81 @@ public sealed record WorkspaceBarSectionSettings(
     string Align = "left",
     WorkspaceBarStyleSettings? Style = null,
     IReadOnlyList<string>? Widgets = null);
+
+public sealed record RunnerSettings(
+    bool Enabled = true,
+    int MaxResults = 8,
+    string Matching = "fuzzy",
+    IReadOnlyList<string>? Sources = null,
+    RunnerWindowSettings Window = null!,
+    RunnerStyleSettings Style = null!,
+    RunnerInputSettings Input = null!,
+    RunnerResultsSettings Results = null!,
+    RunnerIconsSettings Icons = null!)
+{
+    public static RunnerSettings Default { get; } = new(
+        Window: RunnerWindowSettings.Default,
+        Style: RunnerStyleSettings.Default,
+        Input: RunnerInputSettings.Default,
+        Results: RunnerResultsSettings.Default,
+        Icons: RunnerIconsSettings.Default);
+}
+
+public sealed record RunnerWindowSettings(
+    string Position = "top-center",
+    int Width = 720,
+    int MaxHeight = 560,
+    int OffsetX = 0,
+    int OffsetY = 96)
+{
+    public static RunnerWindowSettings Default { get; } = new();
+}
+
+public sealed record RunnerStyleSettings(
+    string Background = "#1e1e2e",
+    string Color = "#cdd6f4",
+    string BorderColor = "#45475a",
+    int BorderWidth = 1,
+    int Radius = 6,
+    int? PaddingTop = null,
+    int? PaddingRight = null,
+    int? PaddingBottom = null,
+    int? PaddingLeft = null,
+    string FontFamily = "Cascadia Mono",
+    float FontSize = 12,
+    string? Weight = null,
+    bool? Italic = null)
+{
+    public static RunnerStyleSettings Default { get; } = new();
+}
+
+public sealed record RunnerInputSettings(
+    string Prompt = "run",
+    string Background = "#313244",
+    string Color = "#cdd6f4",
+    string PlaceholderColor = "#6c7086",
+    int Height = 36)
+{
+    public static RunnerInputSettings Default { get; } = new();
+}
+
+public sealed record RunnerResultsSettings(
+    int RowHeight = 40,
+    int Spacing = 4,
+    string Background = "#1e1e2e",
+    string Color = "#cdd6f4",
+    string SelectedBackground = "#cba6f7",
+    string SelectedColor = "#1e1e2e",
+    string SecondaryColor = "#a6adc8")
+{
+    public static RunnerResultsSettings Default { get; } = new();
+}
+
+public sealed record RunnerIconsSettings(
+    bool Visible = true,
+    int Size = 24,
+    int Padding = 8)
+{
+    public static RunnerIconsSettings Default { get; } = new();
+}
+
