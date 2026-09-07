@@ -444,12 +444,12 @@ internal sealed class WmApplication
         {
             // Works regardless of management state, like dwm-win32's MOD+E: Explorer keeps
             // running (tray icons stay alive), only the shell chrome is shown/hidden.
-            var explorerVisible = _explorerVisibility.Toggle();
+            var explorerVisible = _explorerVisibility.Toggle(_settings.ToggleExplorerBehaviour);
             if (_managementState.IsEnabled)
             {
                 RetilePrimaryWindows();
             }
-            _log.Info("explorer_visibility_toggled", new { visible = explorerVisible });
+            _log.Info("explorer_visibility_toggled", new { visible = explorerVisible, behaviour = _settings.ToggleExplorerBehaviour.ToString() });
             return;
         }
 

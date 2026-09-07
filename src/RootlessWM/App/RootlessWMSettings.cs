@@ -11,7 +11,8 @@ public sealed record RootlessWMSettings(
     IReadOnlyDictionary<string, string>? Hotkeys = null,
     string Layout = "MasterLeft",
     int MasterCount = 1,
-    [property: JsonPropertyName("StatusBar")] WorkspaceBarSettings? WorkspaceBar = null)
+    [property: JsonPropertyName("StatusBar")] WorkspaceBarSettings? WorkspaceBar = null,
+    ToggleExplorerBehaviour ToggleExplorerBehaviour = ToggleExplorerBehaviour.TaskbarOnly)
 {
     public static RootlessWMSettings Default { get; } = new(0.55, 0, 0);
 

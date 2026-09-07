@@ -68,6 +68,24 @@ public sealed class RootlessWMSettingsTests
     }
 
     [Fact]
+    public void Default_ToggleExplorerBehaviour_HidesTaskbarOnly()
+    {
+        Assert.Equal(ToggleExplorerBehaviour.TaskbarOnly, RootlessWMSettings.Default.ToggleExplorerBehaviour);
+    }
+
+    [Fact]
+    public void Constructor_ToggleExplorerBehaviour_PreservesConfiguredValue()
+    {
+        var settings = new RootlessWMSettings(
+            0.55,
+            0,
+            0,
+            ToggleExplorerBehaviour: ToggleExplorerBehaviour.TaskbarAndDesktopIcons);
+
+        Assert.Equal(ToggleExplorerBehaviour.TaskbarAndDesktopIcons, settings.ToggleExplorerBehaviour);
+    }
+
+    [Fact]
     public void ToLayoutOptions_MasterTop_ParsesConfiguredMode()
     {
         var options = new RootlessWMSettings(0.5, 8, 8, Layout: "MasterTop").ToLayoutOptions();

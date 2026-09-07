@@ -1,5 +1,6 @@
 using Tomlyn;
 using Tomlyn.Model;
+using RootlessWM.Domain;
 
 namespace RootlessWM.App;
 
@@ -50,8 +51,14 @@ internal sealed class TomlSettingsProvider
             GetStringMap(table, "Hotkeys"),
             GetString(table, "Layout") ?? "MasterLeft",
             (int)(GetLong(table, "MasterCount") ?? 1),
-            MapWorkspaceBar(GetTable(table, "StatusBar")));
+            MapWorkspaceBar(GetTable(table, "StatusBar")),
+            MapToggleExplorerBehaviour(GetString(table, "ToggleExplorerBehaviour") ?? "TaskbarOnly"));
     }
+
+    private static ToggleExplorerBehaviour MapToggleExplorerBehaviour(string value)
+        => Enum.TryParse<ToggleExplorerBehaviour>(value, ignoreCase: true, out var behaviour)
+            ? behaviour
+            : throw new ArgumentOutOfRangeException(nameof(RootlessWMSettings.ToggleExplorerBehaviour), value, "The toggle explorer behaviour is not supported.");
 
     private static WorkspaceBarSettings? MapWorkspaceBar(TomlTable? table)
     {

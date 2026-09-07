@@ -8,6 +8,13 @@ inner-gap = 8
 layout = "MasterLeft"
 master-count = 1
 
+# Controls what Alt+E / ToggleExplorer hides while Explorer keeps running.
+# Options:
+# - TaskbarOnly: hide taskbars only; wallpaper and desktop icons remain visible.
+# - TaskbarAndDesktopIcons: hide taskbars and desktop icons; wallpaper remains visible.
+# - TaskbarWallpaperAndDesktopIcons: hide taskbars plus Progman; wallpaper and desktop icons disappear.
+toggle-explorer-behaviour = "TaskbarOnly"
+
 # The bar is an ordered set of styled sections.
 [statusbar]
 visible = true

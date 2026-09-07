@@ -1,9 +1,10 @@
 using System.Text;
+using RootlessWM.Domain;
 
 namespace RootlessWM.Platform.Win32;
 
 /// <summary>
-/// Shows/hides the Windows shell chrome (desktop icons via Progman, and all taskbars)
+/// Shows/hides selected Windows shell chrome (taskbar, desktop icons, or wallpaper)
 /// without stopping Explorer, so tray icons keep working while the chrome is hidden.
 /// Inspired by dwm-win32's MOD+E toggle.
 /// </summary>
@@ -15,10 +16,10 @@ internal sealed class ExplorerVisibilityController
         "Shell_SecondaryTrayWnd"
     };
 
-    /// <summary>Flips shell chrome visibility. Returns true when the chrome is now visible.</summary>
-    public bool Toggle()
+    /// <summary>Flips configured shell chrome visibility. Returns true when the chrome is now visible.</summary>
+    public bool Toggle(ToggleExplorerBehaviour behaviour)
     {
-        var handles = GetShellWindowHandles();
+        var handles = GetShellWindowHandles(behaviour);
         var currentlyVisible = handles.Any(NativeMethods.IsWindowVisible);
         SetVisibility(handles, !currentlyVisible);
         return !currentlyVisible;
@@ -27,24 +28,38 @@ internal sealed class ExplorerVisibilityController
     /// <summary>Forces the shell chrome back on. Used on management disable and process exit.</summary>
     public void EnsureVisible()
     {
-        SetVisibility(GetShellWindowHandles(), visible: true);
+        SetVisibility(GetShellWindowHandles(ToggleExplorerBehaviour.TaskbarWallpaperAndDesktopIcons), visible: true);
     }
 
-    private static List<nint> GetShellWindowHandles()
+    private static List<nint> GetShellWindowHandles(ToggleExplorerBehaviour behaviour)
     {
         var handles = new List<nint>();
-        var progman = NativeMethods.FindWindow("Progman", "Program Manager");
-        if (progman != nint.Zero)
+        handles.AddRange(GetTaskbarWindowHandles());
+
+        if (behaviour == ToggleExplorerBehaviour.TaskbarAndDesktopIcons)
         {
-            handles.Add(progman);
+            handles.AddRange(GetDesktopIconWindowHandles());
         }
 
+        if (behaviour == ToggleExplorerBehaviour.TaskbarWallpaperAndDesktopIcons)
+        {
+            var progman = NativeMethods.FindWindow("Progman", "Program Manager");
+            if (progman != nint.Zero)
+            {
+                handles.Add(progman);
+            }
+        }
+
+        return handles.Distinct().ToList();
+    }
+
+    private static List<nint> GetTaskbarWindowHandles()
+    {
+        var handles = new List<nint>();
         // One Shell_SecondaryTrayWnd exists per secondary monitor, so enumerate rather than FindWindow.
         _ = NativeMethods.EnumWindows((windowHandle, _) =>
         {
-            var className = new StringBuilder(64);
-            _ = NativeMethods.GetClassName(windowHandle, className, className.Capacity);
-            if (TaskbarWindowClasses.Contains(className.ToString()))
+            if (TaskbarWindowClasses.Contains(GetClassName(windowHandle)))
             {
                 handles.Add(windowHandle);
             }
@@ -52,6 +67,48 @@ internal sealed class ExplorerVisibilityController
             return true;
         }, nint.Zero);
         return handles;
+    }
+
+    private static List<nint> GetDesktopIconWindowHandles()
+    {
+        var handles = new List<nint>();
+        var progman = NativeMethods.FindWindow("Progman", "Program Manager");
+        AddDesktopIconWindow(progman, handles);
+
+        _ = NativeMethods.EnumWindows((windowHandle, _) =>
+        {
+            if (string.Equals(GetClassName(windowHandle), "WorkerW", StringComparison.OrdinalIgnoreCase))
+            {
+                AddDesktopIconWindow(windowHandle, handles);
+            }
+
+            return true;
+        }, nint.Zero);
+        return handles;
+    }
+
+    private static void AddDesktopIconWindow(nint parentHandle, ICollection<nint> handles)
+    {
+        if (parentHandle == nint.Zero)
+        {
+            return;
+        }
+
+        var shellView = NativeMethods.FindWindowEx(parentHandle, nint.Zero, "SHELLDLL_DefView", null);
+        if (shellView == nint.Zero)
+        {
+            return;
+        }
+
+        var iconList = NativeMethods.FindWindowEx(shellView, nint.Zero, "SysListView32", "FolderView");
+        handles.Add(iconList == nint.Zero ? shellView : iconList);
+    }
+
+    private static string GetClassName(nint windowHandle)
+    {
+        var className = new StringBuilder(64);
+        _ = NativeMethods.GetClassName(windowHandle, className, className.Capacity);
+        return className.ToString();
     }
 
     private static void SetVisibility(IReadOnlyList<nint> handles, bool visible)

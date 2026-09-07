@@ -120,6 +120,26 @@ public sealed class TomlSettingsProviderTests
     }
 
     [Fact]
+    public void Load_ToggleExplorerBehaviour_MapsConfiguredValue()
+    {
+        var path = Path.Combine(CreateTempDir(), "settings.toml");
+        File.WriteAllText(path, "toggle-explorer-behaviour = \"TaskbarAndDesktopIcons\"");
+
+        var settings = new TomlSettingsProvider(path).Load();
+
+        Assert.Equal(ToggleExplorerBehaviour.TaskbarAndDesktopIcons, settings.ToggleExplorerBehaviour);
+    }
+
+    [Fact]
+    public void Load_InvalidToggleExplorerBehaviour_Throws()
+    {
+        var path = Path.Combine(CreateTempDir(), "settings.toml");
+        File.WriteAllText(path, "toggle-explorer-behaviour = \"EverythingEverywhere\"");
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => new TomlSettingsProvider(path).Load());
+    }
+
+    [Fact]
     public void Load_InvalidToml_Throws()
     {
         var path = Path.Combine(CreateTempDir(), "settings.toml");
