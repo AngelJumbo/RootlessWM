@@ -33,6 +33,7 @@ internal sealed class WmApplication
     private readonly WorkspaceVisibilitySynchronizer _workspaceVisibilitySynchronizer;
     private readonly Win32WindowCommander _windowCommander = new();
     private readonly Win32CursorController _cursorController = new();
+    private readonly ExplorerVisibilityController _explorerVisibility = new();
     private readonly MouseFocusController _mouseFocusController;
     private readonly ManagementState _managementState = new();
     private readonly IManagedWindowStateStore _windowStateStore = new JsonManagedWindowStateStore();
@@ -345,6 +346,7 @@ internal sealed class WmApplication
             SaveWorkspaceState();
             RunUntileMode();
             _ = _managementState.Disable();
+            _explorerVisibility.EnsureVisible();
         }
 
         void ReloadSettingsAndHotkeys()
@@ -435,6 +437,19 @@ internal sealed class WmApplication
         if (command == TilingCommand.EnableManagement)
         {
             EnableManagement();
+            return;
+        }
+
+        if (command == TilingCommand.ToggleExplorer)
+        {
+            // Works regardless of management state, like dwm-win32's MOD+E: Explorer keeps
+            // running (tray icons stay alive), only the shell chrome is shown/hidden.
+            var explorerVisible = _explorerVisibility.Toggle();
+            if (_managementState.IsEnabled)
+            {
+                RetilePrimaryWindows();
+            }
+            _log.Info("explorer_visibility_toggled", new { visible = explorerVisible });
             return;
         }
 
@@ -803,6 +818,7 @@ internal sealed class WmApplication
         ClearFloatingZOrder();
         RunUntileMode();
         _fullscreenState.Clear();
+        _explorerVisibility.EnsureVisible();
         _workspaceBar?.SetVisible(false);
         _log.Info("management_disabled", new { disabled, reason = "emergency_hotkey" });
     }

@@ -34,6 +34,7 @@ internal sealed class GlobalHotkeySource : IDisposable
         (43, NativeMethods.ModAlt | NativeMethods.ModShift, NativeMethods.VkI, TilingCommand.IncreaseInnerGap),
         (44, NativeMethods.ModAlt | NativeMethods.ModShift, NativeMethods.VkD, TilingCommand.DecreaseInnerGap),
         (45, NativeMethods.ModAlt, NativeMethods.VkM, TilingCommand.MaximizeWindow),
+        (46, NativeMethods.ModAlt, NativeMethods.VkE, TilingCommand.ToggleExplorer),
         (21, NativeMethods.ModAlt, NativeMethods.Vk1, TilingCommand.SelectWorkspace1),
         (22, NativeMethods.ModAlt, NativeMethods.Vk2, TilingCommand.SelectWorkspace2),
         (23, NativeMethods.ModAlt, NativeMethods.Vk3, TilingCommand.SelectWorkspace3),

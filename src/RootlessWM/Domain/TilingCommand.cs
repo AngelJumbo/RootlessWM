@@ -46,5 +46,6 @@ public enum TilingCommand
     MaximizeWindow,
     Close,
     EnableManagement,
-    DisableManagement
+    DisableManagement,
+    ToggleExplorer
 }

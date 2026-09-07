@@ -45,6 +45,7 @@ internal static class NativeMethods
     internal const uint SwpNoZOrder = 0x0004;
     internal const uint SwpNoActivate = 0x0010;
     internal const uint SwpShowWindow = 0x0040;
+    internal const uint SwpHideWindow = 0x0080;
     internal const uint WineventOutOfContext = 0;
     internal const uint WineventSkipOwnProcess = 2;
     internal const uint ModAlt = 0x0001;
@@ -74,6 +75,7 @@ internal static class NativeMethods
     internal const uint VkM = 0x4D;
     internal const uint VkQ = 0x51;
     internal const uint VkR = 0x52;
+    internal const uint VkE = 0x45;
     internal const uint VkEscape = 0x1B;
     internal const uint VkSpace = 0x20;
     internal const uint AttachParentProcess = 0xFFFFFFFF;
@@ -224,6 +226,9 @@ internal static class NativeMethods
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     internal static extern int GetClassName(nint windowHandle, StringBuilder className, int maximumCount);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    internal static extern nint FindWindow(string? className, string? windowName);
 
     [DllImport("user32.dll", SetLastError = true)]
     internal static extern uint GetWindowThreadProcessId(nint windowHandle, out uint processId);
