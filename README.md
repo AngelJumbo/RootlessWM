@@ -97,7 +97,7 @@ dotnet format --verify-no-changes
 
 `--untile` restores the original bounds saved by `--tile`. State is stored at `%LOCALAPPDATA%\RootlessWM\managed-windows.json` before any placement occurs. A pending restore blocks another `--tile` command until recovery completes.
 
-`--manage` starts a persistent multi-monitor session, tiles windows, and restores their saved bounds when it exits. Press `Ctrl+C` to exit. `Alt+J/K` also centers the cursor in the newly focused window. Moving the pointer over a visible managed window focuses it. Default global hotkeys are `Alt+Shift+M` promote master, `Alt+J` focus next, `Alt+K` focus previous, `Alt+L/H` increase/decrease master ratio, `Alt+I/D` increase/decrease master count, `Alt+Shift+O/U` increase/decrease outer gap, `Alt+Shift+I/D` increase/decrease inner gap, `Alt+Shift+L/H` focus next/previous monitor, `Alt+Ctrl+L/H` move to next/previous monitor, `Alt+Shift+J/K` swap with next/previous, `Alt+Shift+N/P` next/previous workspace, `Alt+Ctrl+N/P` move to next/previous workspace, `Alt+1..9` select workspace 1 through 9, `Alt+Shift+1..9` move the active window to workspace 1 through 9, `Alt+T` cycle layout, `Alt+M` toggle fullscreen for the active window, `Alt+F` toggle floating, `Alt+Shift+Q` request close, and `Alt+Space` open the application runner. `Alt+Shift+Esc` disables management and immediately restores saved bounds; `Alt+Shift+R` enables and tiles again. A shortcut that another application has registered is skipped and reported in `management_started`; it does not stop the session. `--no-logs` disables file logging; it can be combined with any mode.
+`--manage` starts a persistent multi-monitor session, tiles windows, and restores their saved bounds when it exits. Press `Ctrl+C` to exit. `Alt+J/K` also centers the cursor in the newly focused window. Moving the pointer over a visible managed window focuses it. Default global hotkeys are `Alt+M` promote master, `Alt+J` focus next, `Alt+K` focus previous, `Alt+L/H` increase/decrease master ratio, `Alt+I/D` increase/decrease master count, `Alt+O/U` increase/decrease outer gap, `Alt+Shift+O/U` increase/decrease inner gap, `Alt+Shift+L/H` focus next/previous monitor, `Alt+Ctrl+L/H` move to next/previous monitor, `Alt+Shift+J/K` swap with next/previous, `Alt+Shift+N/P` next/previous workspace, `Alt+Ctrl+N/P` move to next/previous workspace, `Alt+1..9` select workspace 1 through 9, `Alt+Shift+1..9` move the active window to workspace 1 through 9, `Alt+Space` cycle layout, `Alt+Shift+F` maximize the active window, `Alt+F` toggle floating, `Alt+Q` request close, `Alt+E` toggle Explorer, and `Alt+P` open the application runner. `Alt+Shift+Esc` disables management and immediately restores saved bounds; `Alt+Shift+R` enables and tiles again. A shortcut that another application has registered is skipped and reported in `management_started`; it does not stop the session. `--no-logs` disables file logging; it can be combined with any mode.
 
 ## Local Install
 
@@ -123,122 +123,97 @@ Pass `-RemoveData` to also delete `%LOCALAPPDATA%\RootlessWM`, including setting
 
 This project is still work in progress, some updates may change.
 
-Settings live at `%LOCALAPPDATA%\RootlessWM\settings.toml` you can find an example `settings.example.toml` :
+Configuration files are located at `%LOCALAPPDATA%\RootlessWM\settings.toml`. A complete reference template is available in `settings.example.toml`. All keys are optional; omitted values automatically fall back to their system defaults.
 
-```toml
-MasterRatio = 0.6
-OuterGap = 8
-InnerGap = 8
-Layout = "MasterLeft"
-MasterCount = 1
+#### General Window Manager Options
 
-[StatusBar]
-Visible = true
-Height = 24
-Background = "#101010"
+| Key | Type / Format | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `master-ratio` | Float (`0.05` \u2013 `0.95`) | `0.6` | Proportion of screen width assigned to the master area. |
+| `outer-gap` | Integer ($\\ge 0$) | `8` | Margin (in pixels) between windows and the screen edges. |
+| `inner-gap` | Integer ($\\ge 0$) | `8` | Margin (in pixels) between adjacent tiled windows. |
+| `layout` | String | `"MasterLeft"` | Starting layout mode (`"MasterLeft"`, `"MasterTop"`, `"Monocle"`, `"Floating"`). |
+| `master-count` | Integer (`1` \u2013 `9`) | `1` | Initial number of windows allocated to the master area. |
+| `toggle-explorer-behaviour` | String | `"TaskbarOnly"` | Scope of elements hidden by `ToggleExplorer` (`"TaskbarOnly"`, `"TaskbarAndDesktopIcons"`, `"TaskbarWallpaperAndDesktopIcons"`). |
+| `hide-explorer-on-start` | Boolean | `false` | When true, hides the selected Explorer components immediately on startup. |
+| `excluded-executables` | Array of strings | `["Taskmgr"]` | Process names (without `.exe`) kept floating to avoid failed retile attempts. |
 
-[StatusBar.Workspaces]
-Background = "#101010"
-Foreground = "#D0D0D0"
-CurrentBackground = "#FFFFFF"
-CurrentForeground = "#101010"
-Symbols = ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
+#### Status Bar Configuration (`[statusbar]`)
 
-[StatusBar.Layout]
-Background = "#101010"
-Foreground = "#D0D0D0"
+The status bar accepts colors in `#RRGGBB` (opaque) or `#RRGGBBAA` (with alpha channel, `00` being transparent and `FF` opaque).
 
-[StatusBar.Layout.Symbols]
-MasterLeft = "ML"
-MasterTop = "MT"
-Monocle = "MON"
-Floating = "FLT"
+| Key | Type / Format | Description |
+| :--- | :--- | :--- |
+| `visible` | Boolean | Enables or disables the bar across all monitors. |
+| `height` | Integer (`16` \u2013 `64`) | Reserved height from the top of the monitor's tiling area. |
+| `background` | Hex Color | Base bar background color. |
+| `border` | Table (`width`, `color`) | Border line thickness and color. |
+| `radius` | Integer | Corner rounding radius in pixels. |
+| `padding` | Table (`top`, `bottom`, `left`, `right`) | Outer padding around the bar content. |
+| `spacing` | Integer | Pixel spacing between layout sections. |
+| `font` | Table (`family`, `size`, `weight`) | Global font properties for the bar text. |
 
-[StatusBar.Title]
-Background = "#101010"
-CurrentBackground = "#101010"
-CurrentForeground = "#FFFFFF"
+#### Status Bar Sections & Elements
 
-[StatusBar.Widgets]
-Order = ["cpu", "memory", "clock"]
+The bar layout is structured into ordered `[[statusbar.sections]]` matching specific IDs:
 
-[StatusBar.Widgets.Cpu]
-Enabled = true
-Symbol = "CPU"
-SymbolBackground = "#101010"
-SymbolForeground = "#D0D0D0"
-ResultBackground = "#101010"
-ResultForeground = "#D0D0D0"
+| Section / Table | Key Settings | Description |
+| :--- | :--- | :--- |
+| `[[statusbar.sections]]` | `id`, `align`, `widgets`, `max-width` | Positions UI segments (`workspaces`, `layout`, `title`, `widgets`) to `left`, `center`, or `right`. |
+| `[statusbar.workspaces]` | `background`, `color`, `current-background`, `current-color`, `symbols` | Styles the workspace indicator and supplies custom workspace labels. |
+| `[statusbar.layout]` | `background`, `color`, `symbols` | Configures colors and custom short text for layout modes (`MasterLeft`, `MasterTop`, `monocle`, `floating`). |
+| `[statusbar.title]` | `background`, `color`, `current-background`, `current-color` | Styles the focused window title on the active monitor. |
+| `[[statusbar.widgets]]` | `id`, `kind`, `symbol`, `symbol-color`, `color`, `background`, `padding` | Configures built-in widgets (`cpu`, `memory`, `clock`, `date`, `uptime`, `battery`, `disk`, `network`, `text`, `command`). |
 
-[StatusBar.Widgets.Memory]
-Enabled = true
-Symbol = "MEM"
-SymbolBackground = "#101010"
-SymbolForeground = "#D0D0D0"
-ResultBackground = "#101010"
-ResultForeground = "#D0D0D0"
+#### Application Runner (`[runner]`)
 
-[StatusBar.Widgets.Clock]
-Enabled = true
-Symbol = ""
-SymbolBackground = "#101010"
-SymbolForeground = "#D0D0D0"
-ResultBackground = "#101010"
-ResultForeground = "#D0D0D0"
+The built-in launcher provides quick access to installed executables.
 
-[Hotkeys]
-OpenRunner = "Alt+Space"
-PromoteToMaster = "Alt+Shift+M"
-FocusNext = "Alt+J"
-FocusPrevious = "Alt+K"
-SelectWorkspace1 = "Alt+1"
-SelectWorkspace2 = "Alt+2"
-SelectWorkspace3 = "Alt+3"
-SelectWorkspace4 = "Alt+4"
-SelectWorkspace5 = "Alt+5"
-SelectWorkspace6 = "Alt+6"
-SelectWorkspace7 = "Alt+7"
-SelectWorkspace8 = "Alt+8"
-SelectWorkspace9 = "Alt+9"
-MoveToWorkspace1 = "Alt+Shift+1"
-MoveToWorkspace2 = "Alt+Shift+2"
-MoveToWorkspace3 = "Alt+Shift+3"
-MoveToWorkspace4 = "Alt+Shift+4"
-MoveToWorkspace5 = "Alt+Shift+5"
-MoveToWorkspace6 = "Alt+Shift+6"
-MoveToWorkspace7 = "Alt+Shift+7"
-MoveToWorkspace8 = "Alt+Shift+8"
-MoveToWorkspace9 = "Alt+Shift+9"
-IncreaseMasterRatio = "Alt+L"
-DecreaseMasterRatio = "Alt+H"
-IncreaseMasterCount = "Alt+I"
-DecreaseMasterCount = "Alt+D"
-IncreaseOuterGap = "Alt+Shift+O"
-DecreaseOuterGap = "Alt+Shift+U"
-IncreaseInnerGap = "Alt+Shift+I"
-DecreaseInnerGap = "Alt+Shift+D"
-FocusNextMonitor = "Alt+Shift+L"
-FocusPreviousMonitor = "Alt+Shift+H"
-MoveToNextMonitor = "Alt+Ctrl+L"
-MoveToPreviousMonitor = "Alt+Ctrl+H"
-CycleLayout = "Alt+T"
-MaximizeWindow = "Alt+M"
-ToggleFloating = "Alt+F"
-SwapWithNext = "Alt+Shift+J"
-SwapWithPrevious = "Alt+Shift+K"
-Close = "Alt+Shift+Q"
-```
+| Sub-table | Key | Default / Format | Description |
+| :--- | :--- | :--- | :--- |
+| `[runner]` | `enabled` | `true` | Enables or disables the quick-launch runner. |
+| | `max-results` | `8` | Maximum matching entries rendered. |
+| | `matching` | `"fuzzy"` | Search matching algorithm. |
+| | `sources` | Array | Index sources (`"start-menu"`, `"app-paths"`, `"path"`). |
+| `[runner.window]` | `position` | `"top-center"` | Placement (`top-left`, `top-center`, `top-right`, `center`). |
+| | `width`, `max-height` | `720`, `560` | Overall launcher window dimensions in pixels. |
+| | `offset-x`, `offset-y` | `0`, `96` | Pixel offsets relative to the target screen anchor. |
+| `[runner.style]` | `background`, `color`, `border-color`, `radius`, `font-*` | Style settings | Visual container styling; supports `#RRGGBBAA` alpha transparency. |
+| `[runner.input]` | `prompt`, `height`, `placeholder-color` | Input settings | Input bar layout, placeholder text, and field height. |
+| `[runner.results]` | `row-height`, `spacing`, `selected-background` | Results list | Spacing and highlight colors for hovered/active entries. |
+| `[runner.icons]` | `visible`, `size`, `padding` | Icon settings | Toggles Windows executable icons alongside result text. |
 
-`MasterRatio` must be from `0.05` through `0.95`; `OuterGap` and `InnerGap` must be zero or greater. `OuterGap` is the space between windows and the screen border; `InnerGap` is the space between adjacent windows. `MasterCount` must be from `1` through `9` and sets the initial number of windows in the master area. `Hotkeys` maps a command name to an `Alt`, `Ctrl`, and/or `Shift` binding with a letter, digit, `Space`, or `Escape` key. Invalid settings or individual bindings fall back to defaults. During `--manage`, the tray provides the same core window commands as hotkeys, plus enable, restore, reload-settings, and exit controls.
+#### Default Hotkey Bindings (`[Hotkeys]`)
+
+Hotkeys support combinations of modifier keys (`Alt`, `Ctrl`, `Shift`) alongside letters, digits, `Space`, or `Escape`.
+
+| Action | Shortcut | Description |
+| :--- | :--- | :--- |
+| **Window Navigation** | | |
+| `FocusNext` | `Alt+J` | Move focus to next window in stack. |
+| `FocusPrevious` | `Alt+K` | Move focus to previous window in stack. |
+| `SwapWithNext` | `Alt+Shift+J` | Swap active window with the next window. |
+| `SwapWithPrevious` | `Alt+Shift+K` | Swap active window with the previous window. |
+| `PromoteToMaster` | `Alt+M` | Move the focused window into the master position. |
+| `Close` | `Alt+Q` | Close active window. |
+| **Layout & Windows** | | |
+| `CycleLayout` | `Alt+Space` | Cycle through master, monocle, and floating modes. |
+| `MaximizeWindow` | `Alt+Shift+F` | Toggle fullscreen mode (removes gaps and bar space). |
+| `ToggleFloating` | `Alt+F` | Toggle tiling on active window. |
+| `IncreaseMasterRatio` / `DecreaseMasterRatio` | `Alt+L` / `Alt+H` | Expand or shrink master window width ratio. |
+| `IncreaseMasterCount` / `DecreaseMasterCount` | `Alt+I` / `Alt+D` | Adjust number of windows in the master region. |
+| `IncreaseOuterGap` / `DecreaseOuterGap` | `Alt+O` / `Alt+U` | Adjust screen border gaps. |
+| `IncreaseInnerGap` / `DecreaseInnerGap` | `Alt+Shift+O` / `Alt+Shift+U` | Adjust spacing between tiled windows. |
+| **Workspaces & Monitors** | | |
+| `SelectWorkspace1` \u2013 `9` | `Alt+1` through `Alt+9` | Switch to workspace 1\u20139. |
+| `MoveToWorkspace1` \u2013 `9` | `Alt+Shift+1` through `Alt+Shift+9` | Move active window to workspace 1\u20139. |
+| `FocusNextMonitor` / `FocusPreviousMonitor` | `Alt+Shift+L` / `Alt+Shift+H` | Shift focus across displays. |
+| `MoveToNextMonitor` / `MoveToPreviousMonitor` | `Alt+Ctrl+L` / `Alt+Ctrl+H` | Move window to next or previous display. |
+| **System & Shell** | | |
+| `OpenRunner` | `Alt+P` | Launch the application search prompt. |
+| `ToggleExplorer` | `Alt+E` | Toggle visibility of Windows Explorer chrome / taskbar. |
 
 
-`StatusBar` configures the optional top bar shown on every monitor. It is visible by default; set `Visible` to `false` to hide it. When visible, `Height` (from `16` through `64`) is reserved from the top of each monitor's tiling work area so managed windows do not overlap it. `Background` sets the overall bar color. The `Workspaces` section colors the workspace-number area (`Background`, `Foreground`) and the active workspace (`CurrentBackground`, `CurrentForeground`), and `Symbols` lists one symbol per workspace (falling back to the number when the list is shorter). The `Layout` section colors the layout indicator and maps each layout mode (`MasterLeft`, `MasterTop`, `Monocle`, `Floating`) to a symbol. The `Title` section colors the centered focused-window title, which is shown only on the focused monitor. The `Widgets` section selects and orders widgets via `Order` (a list of `cpu`, `memory`, `clock`, `date`, `uptime`, `battery`, `disk`, `network`, `text`); each widget has `Enabled`, a `Symbol`, and independent `SymbolBackground`/`SymbolForeground` and `ResultBackground`/`ResultForeground` colors. The `text` widget also accepts a `Text` value to display a static string. Colors accept `#RRGGBB` (opaque) or `#RRGGBBAA`; the final two hex digits are alpha, from `00` (transparent) to `FF` (opaque). Alpha applies independently to bar, section, workspace, and widget colors, allowing windows behind the bar to show through. The RootlessWM tray tooltip always reports management state, current workspace, tiled-window count, master ratio, master count, and inner/outer gap sizes.
-
-`runner` configures the built-in application runner. `enabled` controls whether the runner can open, `max-results` limits visible matches, and `sources` selects any combination of `start-menu`, `app-paths`, and `path`. `window.position` accepts `top-left`, `top-center`, `top-right`, or `center`; `offset-x`, `offset-y`, `width`, and `max-height` control placement and size. `style`, `input`, and `results` control the visual appearance, including font, border, selected-result colors, spacing, and row height. `icons.visible`, `icons.size`, and `icons.padding` control associated Windows icons. Runner colors accept `#RRGGBB` or `#RRGGBBAA`, using the final two digits for alpha. See `settings.example.toml` for a complete runner configuration.
-
-`Layout` accepts `MasterLeft`, `MasterTop`, `Monocle`, or `Floating`. `CycleLayout` advances through these modes for the active workspace and monitor.
-
-`MaximizeWindow` toggles fullscreen for the active tiled window. The window covers the whole monitor with no gaps and no reserved bar space, and the status bar on that monitor is hidden while it is fullscreen. Fullscreen is tracked per monitor and workspace, and is cleared when the window stops being tiled or management is disabled.
 
 Managed workspace assignments are persisted atomically at `%LOCALAPPDATA%\RootlessWM\workspaces.json`. Each monitor starts on workspace 1 for a new managed session because native monitor handles are session-local; only assignments for currently discovered windows are restored, and stale HWNDs are discarded.
 
