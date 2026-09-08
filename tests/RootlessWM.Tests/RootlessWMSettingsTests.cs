@@ -108,6 +108,20 @@ public sealed class RootlessWMSettingsTests
     }
 
     [Fact]
+    public void Default_HideExplorerOnStart_IsFalse()
+    {
+        Assert.False(RootlessWMSettings.Default.HideExplorerOnStart);
+    }
+
+    [Fact]
+    public void Constructor_HideExplorerOnStart_PreservesConfiguredValue()
+    {
+        var settings = new RootlessWMSettings(0.55, 0, 0, HideExplorerOnStart: true);
+
+        Assert.True(settings.HideExplorerOnStart);
+    }
+
+    [Fact]
     public void ToLayoutOptions_MasterTop_ParsesConfiguredMode()
     {
         var options = new RootlessWMSettings(0.5, 8, 8, Layout: "MasterTop").ToLayoutOptions();

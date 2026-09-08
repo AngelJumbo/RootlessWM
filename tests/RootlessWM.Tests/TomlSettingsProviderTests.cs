@@ -131,6 +131,17 @@ public sealed class TomlSettingsProviderTests
     }
 
     [Fact]
+    public void Load_HideExplorerOnStart_MapsConfiguredValue()
+    {
+        var path = Path.Combine(CreateTempDir(), "settings.toml");
+        File.WriteAllText(path, "hide-explorer-on-start = true");
+
+        var settings = new TomlSettingsProvider(path).Load();
+
+        Assert.True(settings.HideExplorerOnStart);
+    }
+
+    [Fact]
     public void Load_RunnerConfig_MapsConfiguredValuesAndHotkey()
     {
         var path = Path.Combine(CreateTempDir(), "settings.toml");
