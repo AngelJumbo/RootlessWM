@@ -4,8 +4,8 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using Microsoft.Win32;
 using RootlessWM.Platform.Win32;
-using SkiaSharp;
 using System.Security;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace RootlessWM.App;
@@ -64,6 +64,7 @@ internal sealed class RunnerController : IDisposable
     private sealed class RunnerForm : Form
     {
         private readonly ConsoleDiagnosticLog _log;
+        private readonly Direct2DRenderer _renderer = new();
         private RunnerSettings _settings;
         private List<RunnerItem> _items = [];
         private string _query = string.Empty;
@@ -110,6 +111,16 @@ internal sealed class RunnerController : IDisposable
         }
 
         protected override bool ShowWithoutActivation => false;
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _renderer.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
 
         protected override CreateParams CreateParams
         {
@@ -234,105 +245,76 @@ internal sealed class RunnerController : IDisposable
             }
 
             using var bitmap = new Bitmap(Width, Height, PixelFormat.Format32bppPArgb);
-            var bitmapData = bitmap.LockBits(new Rectangle(0, 0, bitmap.Width, bitmap.Height), ImageLockMode.WriteOnly, bitmap.PixelFormat);
-            try
-            {
-                var imageInfo = new SKImageInfo(bitmap.Width, bitmap.Height, SKColorType.Bgra8888, SKAlphaType.Premul);
-                using var surface = SKSurface.Create(imageInfo, bitmapData.Scan0, bitmapData.Stride);
-                Draw(surface.Canvas, bitmap.Width, bitmap.Height);
-                surface.Flush();
-            }
-            finally
-            {
-                bitmap.UnlockBits(bitmapData);
-            }
+            _renderer.Dpi = DeviceDpi;
+            _renderer.Render(bitmap, canvas => Draw(canvas, bitmap.Width, bitmap.Height));
+            DrawIcons(bitmap);
 
             UpdateLayer(bitmap);
         }
 
-        private void Draw(SKCanvas canvas, int width, int height)
+        private void Draw(Direct2DRenderer.Direct2DCanvas canvas, int width, int height)
         {
             var style = _settings.Style;
             var results = _settings.Results;
             var input = _settings.Input;
-            var outer = new SKRect(0, 0, width, height);
-            var inputRect = new SKRect(20, 20, width - 20, 20 + input.Height);
+            var outer = new RectangleF(0, 0, width, height);
+            var inputRect = new RectangleF(20, 20, width - 40, input.Height);
             var resultsTop = inputRect.Bottom + 12;
             var rowHeight = Math.Max(28, results.RowHeight);
 
-            canvas.Clear(SKColors.Transparent);
-            using var panelPaint = new SKPaint { Color = ParseColor(style.Background), IsAntialias = true };
-            canvas.DrawRoundRect(outer, Math.Max(0, style.Radius), Math.Max(0, style.Radius), panelPaint);
-            using var borderPaint = new SKPaint { Color = ParseColor(style.BorderColor), Style = SKPaintStyle.Stroke, StrokeWidth = Math.Max(1, style.BorderWidth), IsAntialias = true };
-            canvas.DrawRoundRect(new SKRect(1, 1, width - 1, height - 1), Math.Max(0, style.Radius), Math.Max(0, style.Radius), borderPaint);
-
-            using var inputPaint = new SKPaint { Color = ParseColor(input.Background), IsAntialias = true };
-            canvas.DrawRoundRect(inputRect, 4, 4, inputPaint);
-            using var inputText = CreateTextPaint(input.Color, style, style.FontSize);
+            canvas.FillRoundedRectangle(outer, Math.Max(0, style.Radius), ParseColor(style.Background));
+            canvas.DrawRoundedRectangle(new RectangleF(1, 1, width - 2, height - 2), Math.Max(0, style.Radius), ParseColor(style.BorderColor), Math.Max(1, style.BorderWidth));
+            canvas.FillRoundedRectangle(inputRect, 4, ParseColor(input.Background));
             var prompt = string.IsNullOrEmpty(_query) ? input.Prompt : _query;
-            canvas.DrawText(prompt, inputRect.Left + 12, inputRect.MidY - (inputText.FontMetrics.Ascent + inputText.FontMetrics.Descent) / 2, inputText);
+            canvas.DrawText(prompt, new RectangleF(inputRect.Left + 12, inputRect.Top, inputRect.Width - 24, inputRect.Height), ParseColor(input.Color), style.FontFamily, style.FontSize * DeviceDpi / 96F, style.Italic == true ? FontStyle.Italic : FontStyle.Regular, Direct2DRenderer.Direct2DCanvas.TextAlignment.Left);
 
             for (var index = 0; index < _items.Count; index++)
             {
                 var top = resultsTop + index * rowHeight;
-                var row = new SKRect(20, top, width - 20, top + rowHeight);
+                var row = new RectangleF(20, top, width - 40, rowHeight);
                 var selected = index == _selectedIndex;
-                using var rowPaint = new SKPaint { Color = ParseColor(selected ? results.SelectedBackground : results.Background), IsAntialias = true };
-                canvas.DrawRoundRect(row, 4, 4, rowPaint);
+                canvas.FillRoundedRectangle(row, 4, ParseColor(selected ? results.SelectedBackground : results.Background));
                 var textLeft = row.Left + 12;
                 if (_settings.Icons.Visible)
                 {
-                    DrawIcon(canvas, _items[index].Target, row, out var iconRight);
-                    textLeft = iconRight + _settings.Icons.Padding;
+                    textLeft += Math.Clamp(_settings.Icons.Size, 16, 64) + _settings.Icons.Padding;
                 }
-                using var namePaint = CreateTextPaint(selected ? results.SelectedColor : results.Color, style, style.FontSize);
-                using var secondaryPaint = CreateTextPaint(results.SecondaryColor, style, Math.Max(9, style.FontSize - 2));
-                canvas.DrawText(_items[index].Name, textLeft, row.Top + 17, namePaint);
-                canvas.DrawText(_items[index].Source, textLeft, row.Top + 34, secondaryPaint);
+                var textWidth = Math.Max(1, row.Right - textLeft - 12);
+                canvas.DrawText(_items[index].Name, new RectangleF(textLeft, row.Top, textWidth, row.Height / 2), ParseColor(selected ? results.SelectedColor : results.Color), style.FontFamily, style.FontSize * DeviceDpi / 96F, style.Italic == true ? FontStyle.Italic : FontStyle.Regular, Direct2DRenderer.Direct2DCanvas.TextAlignment.Left);
+                canvas.DrawText(_items[index].Source, new RectangleF(textLeft, row.Top + row.Height / 2, textWidth, row.Height / 2), ParseColor(results.SecondaryColor), style.FontFamily, Math.Max(9, style.FontSize - 2) * DeviceDpi / 96F, style.Italic == true ? FontStyle.Italic : FontStyle.Regular, Direct2DRenderer.Direct2DCanvas.TextAlignment.Left);
             }
 
-            using var statusPaint = CreateTextPaint(results.SecondaryColor, style, Math.Max(9, style.FontSize - 2));
-            canvas.DrawText(_items.Count == 0 ? "No applications found" : $"{_items.Count} applications", 20, height - 9, statusPaint);
+            canvas.DrawText(_items.Count == 0 ? "No applications found" : $"{_items.Count} applications", new RectangleF(20, height - 24, width - 40, 20), ParseColor(results.SecondaryColor), style.FontFamily, Math.Max(9, style.FontSize - 2) * DeviceDpi / 96F, style.Italic == true ? FontStyle.Italic : FontStyle.Regular, Direct2DRenderer.Direct2DCanvas.TextAlignment.Left);
         }
 
-        private static SKPaint CreateTextPaint(string color, RunnerStyleSettings style, float size)
+        private void DrawIcons(Bitmap bitmap)
         {
-            return new SKPaint
+            if (!_settings.Icons.Visible)
             {
-                Color = ParseColor(color),
-                TextSize = size,
-                IsAntialias = true,
-                Typeface = SKTypeface.FromFamilyName(style.FontFamily, style.Italic == true ? SKFontStyle.Italic : SKFontStyle.Normal)
-            };
-        }
+                return;
+            }
 
-        private void DrawIcon(SKCanvas canvas, string target, SKRect row, out float iconRight)
-        {
+            using var graphics = Graphics.FromImage(bitmap);
+            graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
             var size = Math.Clamp(_settings.Icons.Size, 16, 64);
-            var left = row.Left + 12;
-            var top = row.Top + Math.Max(0, (row.Height - size) / 2F);
-            iconRight = left + size;
-            try
+            var rowHeight = Math.Max(28, _settings.Results.RowHeight);
+            var resultsTop = 20 + Math.Max(32, _settings.Input.Height) + 12;
+            for (var index = 0; index < _items.Count; index++)
             {
-                using var icon = Icon.ExtractAssociatedIcon(target);
-                if (icon is null)
+                var top = resultsTop + index * rowHeight;
+                try
                 {
-                    return;
+                    using var icon = Icon.ExtractAssociatedIcon(_items[index].Target);
+                    if (icon is not null)
+                    {
+                        using var iconBitmap = icon.ToBitmap();
+                        graphics.DrawImage(iconBitmap, new Rectangle(32, top + Math.Max(0, (rowHeight - size) / 2), size, size));
+                    }
                 }
-
-                using var bitmap = icon.ToBitmap();
-                using var stream = new MemoryStream();
-                bitmap.Save(stream, ImageFormat.Png);
-                stream.Position = 0;
-                using var skBitmap = SKBitmap.Decode(stream);
-                if (skBitmap is not null)
+                catch (Exception exception) when (exception is ArgumentException or ExternalException or IOException)
                 {
-                    canvas.DrawBitmap(skBitmap, new SKRect(left, top, iconRight, top + size));
+                    _log.Info("runner_icon_skipped", new { target = _items[index].Target, reason = exception.GetType().Name });
                 }
-            }
-            catch (Exception exception) when (exception is ArgumentException or System.Runtime.InteropServices.ExternalException or IOException)
-            {
-                _log.Info("runner_icon_skipped", new { target, reason = exception.GetType().Name });
             }
         }
 
@@ -472,7 +454,7 @@ internal sealed class RunnerController : IDisposable
             return extension.Equals(".exe", StringComparison.OrdinalIgnoreCase) || extension.Equals(".com", StringComparison.OrdinalIgnoreCase) || extension.Equals(".bat", StringComparison.OrdinalIgnoreCase) || extension.Equals(".cmd", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static SKColor ParseColor(string value)
+        private static Color ParseColor(string value)
         {
             if (value.Length == 9 && value[0] == '#'
                 && byte.TryParse(value.AsSpan(1, 2), System.Globalization.NumberStyles.HexNumber, null, out var red)
@@ -480,10 +462,17 @@ internal sealed class RunnerController : IDisposable
                 && byte.TryParse(value.AsSpan(5, 2), System.Globalization.NumberStyles.HexNumber, null, out var blue)
                 && byte.TryParse(value.AsSpan(7, 2), System.Globalization.NumberStyles.HexNumber, null, out var alpha))
             {
-                return new SKColor(red, green, blue, alpha);
+                return Color.FromArgb(alpha, red, green, blue);
             }
 
-            return SKColor.TryParse(value, out var color) ? color : SKColors.Transparent;
+            try
+            {
+                return ColorTranslator.FromHtml(value);
+            }
+            catch (Exception) when (value is not null)
+            {
+                return Color.Transparent;
+            }
         }
 
         private sealed record RunnerItem(string Name, string Target, string Arguments, string WorkingDirectory, string Source);

@@ -3,7 +3,6 @@ using System.Drawing.Imaging;
 using System.Windows.Forms;
 using RootlessWM.Domain;
 using RootlessWM.Platform.Win32;
-using SkiaSharp;
 
 namespace RootlessWM.App;
 
@@ -147,6 +146,7 @@ internal sealed class WorkspaceBarController : IDisposable
         private readonly List<(string Signature, IWidgetProvider Provider)> _widgetProviders = [];
         private readonly WorkspaceBarWidgetRegistry _widgetRegistry;
         private readonly ConsoleDiagnosticLog _log;
+        private readonly Direct2DRenderer _renderer = new();
         private Rectangle _lastBounds = Rectangle.Empty;
         private WorkspaceBarStyleOptions _barStyle = WorkspaceBarStyleOptions.Default;
         private WorkspaceBarOptions _options = WorkspaceBarOptionsDefaults.Create();
@@ -252,27 +252,15 @@ internal sealed class WorkspaceBarController : IDisposable
             }
 
             using var bitmap = new Bitmap(_form.Width, _form.Height, PixelFormat.Format32bppPArgb);
-            var bitmapData = bitmap.LockBits(new Rectangle(0, 0, bitmap.Width, bitmap.Height), ImageLockMode.WriteOnly, bitmap.PixelFormat);
-            try
-            {
-                var imageInfo = new SKImageInfo(bitmap.Width, bitmap.Height, SKColorType.Bgra8888, SKAlphaType.Premul);
-                using var surface = SKSurface.Create(imageInfo, bitmapData.Scan0, bitmapData.Stride);
-                var canvas = surface.Canvas;
-                canvas.Clear(SKColors.Transparent);
-                Draw(canvas, bitmap.Width, bitmap.Height);
-                surface.Flush();
-            }
-            finally
-            {
-                bitmap.UnlockBits(bitmapData);
-            }
+            _renderer.Dpi = _form.DeviceDpi;
+            _renderer.Render(bitmap, canvas => Draw(canvas, bitmap.Width, bitmap.Height));
 
             _form.UpdateLayer(bitmap);
         }
 
-        private void Draw(SKCanvas canvas, int width, int height)
+        private void Draw(Direct2DRenderer.Direct2DCanvas canvas, int width, int height)
         {
-            var barRect = new SKRect(0, 0, width, height);
+            var barRect = new RectangleF(0, 0, width, height);
             DrawBox(canvas, barRect, _barStyle);
             var content = Inset(barRect, _barStyle.Padding, _barStyle.BorderWidth);
             var sections = (_options.Sections ?? []).Where(section => section.Style.Visible).ToList();
@@ -281,7 +269,7 @@ internal sealed class WorkspaceBarController : IDisposable
             DrawSections(canvas, content, sections.Where(section => section.Alignment == WorkspaceBarSectionAlignment.Center).ToList(), WorkspaceBarSectionAlignment.Center);
         }
 
-        private void DrawSections(SKCanvas canvas, SKRect content, IReadOnlyList<WorkspaceBarSectionOptions> sections, WorkspaceBarSectionAlignment alignment)
+        private void DrawSections(Direct2DRenderer.Direct2DCanvas canvas, RectangleF content, IReadOnlyList<WorkspaceBarSectionOptions> sections, WorkspaceBarSectionAlignment alignment)
         {
             var metrics = sections.Select(section => (Section: section, Width: MeasureSection(section))).ToList();
             var totalWidth = metrics.Sum(item => item.Width) + Math.Max(0, metrics.Count - 1) * _barStyle.Spacing;
@@ -295,7 +283,7 @@ internal sealed class WorkspaceBarController : IDisposable
             foreach (var (section, measuredWidth) in metrics)
             {
                 var width = Math.Min(measuredWidth, content.Width);
-                var rect = new SKRect(x, content.Top, x + width, content.Bottom);
+                var rect = new RectangleF(x, content.Top, width, content.Height);
                 DrawSection(canvas, section, rect);
                 x += width + _barStyle.Spacing;
             }
@@ -324,7 +312,7 @@ internal sealed class WorkspaceBarController : IDisposable
             return width;
         }
 
-        private void DrawSection(SKCanvas canvas, WorkspaceBarSectionOptions section, SKRect rect)
+        private void DrawSection(Direct2DRenderer.Direct2DCanvas canvas, WorkspaceBarSectionOptions section, RectangleF rect)
         {
             DrawBox(canvas, rect, section.Style);
             var content = Inset(rect, section.Style.Padding, section.Style.BorderWidth);
@@ -334,12 +322,12 @@ internal sealed class WorkspaceBarController : IDisposable
                     DrawWorkspaces(canvas, content, section.Style);
                     break;
                 case "layout":
-                    DrawText(canvas, GetLayoutText(), content, _options.Layout.Foreground, section.Style, SKTextAlign.Center);
+                    DrawText(canvas, GetLayoutText(), content, _options.Layout.Foreground, section.Style, Direct2DRenderer.Direct2DCanvas.TextAlignment.Center);
                     break;
                 case "title":
                     if (_isFocused)
                     {
-                        DrawText(canvas, _focusedWindowTitle, content, _options.Title.CurrentForeground, section.Style, SKTextAlign.Center, ellipsis: true);
+                        DrawText(canvas, _focusedWindowTitle, content, _options.Title.CurrentForeground, section.Style, Direct2DRenderer.Direct2DCanvas.TextAlignment.Center, ellipsis: true);
                     }
                     break;
                 default:
@@ -348,22 +336,22 @@ internal sealed class WorkspaceBarController : IDisposable
             }
         }
 
-        private void DrawWorkspaces(SKCanvas canvas, SKRect rect, WorkspaceBarStyleOptions style)
+        private void DrawWorkspaces(Direct2DRenderer.Direct2DCanvas canvas, RectangleF rect, WorkspaceBarStyleOptions style)
         {
             var x = rect.Left;
             for (var index = 0; index < WorkspaceCount; index++)
             {
                 var text = _options.Workspaces.Symbols.Count > index ? _options.Workspaces.Symbols[index] : (index + 1).ToString();
                 var textWidth = MeasureText(text, style);
-                var itemRect = new SKRect(x, rect.Top, x + textWidth + 8, rect.Bottom);
+                var itemRect = new RectangleF(x, rect.Top, textWidth + 8, rect.Height);
                 var active = index == _currentWorkspace;
                 DrawFill(canvas, itemRect, active ? _options.Workspaces.CurrentBackground : _options.Workspaces.Background, 0);
-                DrawText(canvas, text, itemRect, active ? _options.Workspaces.CurrentForeground : _options.Workspaces.Foreground, style, SKTextAlign.Center);
+                DrawText(canvas, text, itemRect, active ? _options.Workspaces.CurrentForeground : _options.Workspaces.Foreground, style, Direct2DRenderer.Direct2DCanvas.TextAlignment.Center);
                 x = itemRect.Right + 4;
             }
         }
 
-        private void DrawWidgets(SKCanvas canvas, SKRect rect, WorkspaceBarSectionOptions section, WorkspaceBarStyleOptions sectionStyle)
+        private void DrawWidgets(Direct2DRenderer.Direct2DCanvas canvas, RectangleF rect, WorkspaceBarSectionOptions section, WorkspaceBarStyleOptions sectionStyle)
         {
             if (!_isFocused)
             {
@@ -382,15 +370,15 @@ internal sealed class WorkspaceBarController : IDisposable
                 var text = GetOrCreateProvider(GetWidgetIndex(widget), widget)?.GetText() ?? string.Empty;
                 var symbolWidth = string.IsNullOrEmpty(widget.Symbol) ? 0 : MeasureText(widget.Symbol, style) + 6;
                 var width = widgetWidths[index];
-                var widgetRect = new SKRect(x, rect.Top, x + width, rect.Bottom);
+                var widgetRect = new RectangleF(x, rect.Top, width, rect.Height);
                 DrawFill(canvas, widgetRect, widget.ResultBackground, style.BorderRadius);
                 var content = Inset(widgetRect, style.Padding, style.BorderWidth);
                 if (!string.IsNullOrEmpty(widget.Symbol))
                 {
-                    DrawText(canvas, widget.Symbol, new SKRect(content.Left, content.Top, content.Left + symbolWidth, content.Bottom), widget.SymbolForeground, style, SKTextAlign.Left);
+                    DrawText(canvas, widget.Symbol, new RectangleF(content.Left, content.Top, symbolWidth, content.Height), widget.SymbolForeground, style, Direct2DRenderer.Direct2DCanvas.TextAlignment.Left);
                 }
 
-                DrawText(canvas, text, new SKRect(content.Left + symbolWidth, content.Top, content.Right, content.Bottom), widget.ResultForeground, style, SKTextAlign.Left);
+                DrawText(canvas, text, new RectangleF(content.Left + symbolWidth, content.Top, content.Right - content.Left - symbolWidth, content.Height), widget.ResultForeground, style, Direct2DRenderer.Direct2DCanvas.TextAlignment.Left);
                 x = widgetRect.Right + _barStyle.Spacing;
             }
         }
@@ -417,7 +405,7 @@ internal sealed class WorkspaceBarController : IDisposable
         private string GetLayoutText()
             => _options.Layout.Symbols.TryGetValue(_layoutMode, out var symbol) ? symbol : FormatLayoutMode(_layoutMode);
 
-        private static void DrawBox(SKCanvas canvas, SKRect rect, WorkspaceBarStyleOptions style)
+        private static void DrawBox(Direct2DRenderer.Direct2DCanvas canvas, RectangleF rect, WorkspaceBarStyleOptions style)
         {
             DrawFill(canvas, rect, style.Background, style.BorderRadius);
             if (style.BorderWidth <= 0)
@@ -425,63 +413,39 @@ internal sealed class WorkspaceBarController : IDisposable
                 return;
             }
 
-            using var paint = new SKPaint { IsAntialias = true, Color = ToSkColor(style.BorderColor), Style = SKPaintStyle.Stroke, StrokeWidth = style.BorderWidth };
             var inset = style.BorderWidth / 2F;
-            using var path = CreateRoundedPath(new SKRect(rect.Left + inset, rect.Top + inset, rect.Right - inset, rect.Bottom - inset), style.BorderRadius);
-            canvas.DrawPath(path, paint);
+            canvas.DrawRoundedRectangle(new RectangleF(rect.Left + inset, rect.Top + inset, rect.Width - style.BorderWidth, rect.Height - style.BorderWidth), style.BorderRadius, style.BorderColor, style.BorderWidth);
         }
 
-        private static void DrawFill(SKCanvas canvas, SKRect rect, Color color, int radius)
+        private static void DrawFill(Direct2DRenderer.Direct2DCanvas canvas, RectangleF rect, Color color, int radius)
         {
-            using var paint = new SKPaint { IsAntialias = true, Color = ToSkColor(color), Style = SKPaintStyle.Fill };
-            using var path = CreateRoundedPath(rect, radius);
-            canvas.DrawPath(path, paint);
+            canvas.FillRoundedRectangle(rect, radius, color);
         }
 
-        private static void DrawText(SKCanvas canvas, string text, SKRect rect, Color color, WorkspaceBarStyleOptions style, SKTextAlign align, bool ellipsis = false)
+        private void DrawText(Direct2DRenderer.Direct2DCanvas canvas, string text, RectangleF rect, Color color, WorkspaceBarStyleOptions style, Direct2DRenderer.Direct2DCanvas.TextAlignment align, bool ellipsis = false)
         {
             if (string.IsNullOrEmpty(text) || rect.Width <= 0 || rect.Height <= 0)
             {
                 return;
             }
 
-            using var paint = CreateTextPaint(color, style, align);
-            var displayText = ellipsis ? Ellipsize(text, rect.Width, paint) : text;
-            var metrics = paint.FontMetrics;
-            var y = rect.MidY - ((metrics.Ascent + metrics.Descent) / 2F);
-            var x = align switch
-            {
-                SKTextAlign.Center => rect.MidX,
-                SKTextAlign.Right => rect.Right,
-                _ => rect.Left
-            };
-            canvas.DrawText(displayText, x, y, paint);
+            var pixelSize = style.FontSize * _form.DeviceDpi / 72F;
+            var displayText = ellipsis ? Ellipsize(text, rect.Width, style, pixelSize) : text;
+            canvas.DrawText(displayText, rect, color, style.FontFamily, pixelSize, style.FontStyle, align);
         }
 
-        private static float MeasureText(string text, WorkspaceBarStyleOptions style)
+        private float MeasureText(string text, WorkspaceBarStyleOptions style)
         {
-            using var paint = CreateTextPaint(Color.White, style, SKTextAlign.Left);
-            return paint.MeasureText(text ?? string.Empty);
+            return Direct2DRenderer.MeasureText(text ?? string.Empty, style.FontFamily, style.FontSize * _form.DeviceDpi / 72F, style.FontStyle);
         }
 
-        private static SKPaint CreateTextPaint(Color color, WorkspaceBarStyleOptions style, SKTextAlign align)
-        {
-            var weight = style.FontStyle.HasFlag(FontStyle.Bold) ? SKFontStyleWeight.Bold : SKFontStyleWeight.Normal;
-            var slant = style.FontStyle.HasFlag(FontStyle.Italic) ? SKFontStyleSlant.Italic : SKFontStyleSlant.Upright;
-            return new SKPaint
-            {
-                IsAntialias = true,
-                Color = ToSkColor(color),
-                TextSize = style.FontSize * 96F / 72F,
-                Typeface = SKTypeface.FromFamilyName(style.FontFamily, weight, SKFontStyleWidth.Normal, slant),
-                TextAlign = align
-            };
-        }
+        private float MeasureText(string text, WorkspaceBarStyleOptions style, float pixelSize)
+            => Direct2DRenderer.MeasureText(text ?? string.Empty, style.FontFamily, pixelSize, style.FontStyle);
 
-        private static string Ellipsize(string text, float maxWidth, SKPaint paint)
+        private string Ellipsize(string text, float maxWidth, WorkspaceBarStyleOptions style, float pixelSize)
         {
             const string suffix = "...";
-            if (paint.MeasureText(text) <= maxWidth)
+            if (MeasureText(text, style, pixelSize) <= maxWidth)
             {
                 return text;
             }
@@ -489,7 +453,7 @@ internal sealed class WorkspaceBarController : IDisposable
             for (var length = text.Length - 1; length > 0; length--)
             {
                 var candidate = text[..length] + suffix;
-                if (paint.MeasureText(candidate) <= maxWidth)
+                if (MeasureText(candidate, style, pixelSize) <= maxWidth)
                 {
                     return candidate;
                 }
@@ -498,28 +462,9 @@ internal sealed class WorkspaceBarController : IDisposable
             return suffix;
         }
 
-        private static SKRect Inset(SKRect rect, Padding padding, int borderWidth)
-            => new(
-                rect.Left + padding.Left + borderWidth,
-                rect.Top + padding.Top + borderWidth,
-                rect.Right - padding.Right - borderWidth,
-                rect.Bottom - padding.Bottom - borderWidth);
-
-        private static SKPath CreateRoundedPath(SKRect rect, int radius)
-        {
-            var path = new SKPath();
-            if (radius <= 0)
-            {
-                path.AddRect(rect);
-                return path;
-            }
-
-            path.AddRoundRect(rect, radius, radius);
-            return path;
-        }
-
-        private static SKColor ToSkColor(Color color)
-            => new(color.R, color.G, color.B, color.A);
+        private static RectangleF Inset(RectangleF rect, Padding padding, int borderWidth)
+            => new(rect.Left + padding.Left + borderWidth, rect.Top + padding.Top + borderWidth,
+                rect.Width - padding.Horizontal - borderWidth * 2, rect.Height - padding.Vertical - borderWidth * 2);
 
         private IWidgetProvider? GetOrCreateProvider(int index, WorkspaceBarWidgetOptions widget)
         {
@@ -594,6 +539,7 @@ internal sealed class WorkspaceBarController : IDisposable
             }
 
             _form.Dispose();
+            _renderer.Dispose();
         }
 
         private sealed class WorkspaceBarForm : Form

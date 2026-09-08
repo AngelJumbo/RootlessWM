@@ -82,6 +82,12 @@ internal static class NativeMethods
     internal const uint DwmwaCloaked = 14;
     internal const uint DwmwaWindowCornerPreference = 33;
 
+    [DllImport("d2d1.dll", CallingConvention = CallingConvention.StdCall)]
+    internal static extern int D2D1CreateFactory(uint factoryType, ref Guid riid, nint options, out nint factory);
+
+    [DllImport("dwrite.dll", CallingConvention = CallingConvention.StdCall)]
+    internal static extern int DWriteCreateFactory(uint factoryType, ref Guid iid, out nint factory);
+
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool AttachConsole(uint processId);
