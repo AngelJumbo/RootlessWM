@@ -53,7 +53,8 @@ internal sealed class TomlSettingsProvider
             (int)(GetLong(table, "MasterCount") ?? 1),
             MapWorkspaceBar(GetTable(table, "StatusBar")),
             MapToggleExplorerBehaviour(GetString(table, "ToggleExplorerBehaviour") ?? "TaskbarOnly"),
-            MapRunner(GetTable(table, "Runner")));
+            MapRunner(GetTable(table, "Runner")),
+            GetBool(table, "HideExplorerOnStart") ?? false);
     }
 
     private static ToggleExplorerBehaviour MapToggleExplorerBehaviour(string value)

@@ -15,6 +15,10 @@ master-count = 1
 # - TaskbarWallpaperAndDesktopIcons: hide taskbars plus Progman; wallpaper and desktop icons disappear.
 toggle-explorer-behaviour = "TaskbarOnly"
 
+# When true, applies toggle-explorer-behaviour immediately on startup so the WM
+# starts with Explorer chrome already hidden (Alt+E / ToggleExplorer un-hides it).
+hide-explorer-on-start = false
+
 # The bar is an ordered set of styled sections.
 [statusbar]
 visible = true

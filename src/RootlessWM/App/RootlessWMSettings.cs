@@ -13,7 +13,8 @@ public sealed record RootlessWMSettings(
     int MasterCount = 1,
     [property: JsonPropertyName("StatusBar")] WorkspaceBarSettings? WorkspaceBar = null,
     ToggleExplorerBehaviour ToggleExplorerBehaviour = ToggleExplorerBehaviour.TaskbarOnly,
-    RunnerSettings? Runner = null)
+    RunnerSettings? Runner = null,
+    bool HideExplorerOnStart = false)
 {
     public static RootlessWMSettings Default { get; } = new(0.55, 0, 0);
 

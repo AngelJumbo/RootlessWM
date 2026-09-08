@@ -275,6 +275,10 @@ internal sealed class WmApplication
         LoadWorkspaceState(trackedWindows.Select(window => window.Handle));
         RunTileMode();
         _ = _managementState.Enable();
+        if (_settings.HideExplorerOnStart)
+        {
+            _explorerVisibility.Toggle(_settings.ToggleExplorerBehaviour);
+        }
         ApplyWorkspaceVisibility();
         SaveWorkspaceState();
         using var eventSource = new WindowEventSource();
