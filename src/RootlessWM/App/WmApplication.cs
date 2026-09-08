@@ -19,7 +19,8 @@ internal sealed class WmApplication
     private ConsoleDiagnosticLog _log = new();
     private readonly WindowEnumerator _windowEnumerator = new();
     private readonly WindowInspector _windowInspector = new();
-    private readonly WindowEligibilityClassifier _eligibilityClassifier = new();
+    private readonly WindowEligibilityOptions _eligibilityOptions = new();
+    private readonly WindowEligibilityClassifier _eligibilityClassifier;
     private readonly WindowTracker _windowTracker;
     private readonly TilingState _tilingState = new();
     private readonly MonitorCatalog _monitorCatalog = new();
@@ -53,6 +54,7 @@ internal sealed class WmApplication
 
     public WmApplication()
     {
+        _eligibilityClassifier = new WindowEligibilityClassifier(_eligibilityOptions);
         _windowTracker = new WindowTracker(_eligibilityClassifier);
         _windowTiler = new WindowTiler(
             new MasterStackLayout(),
@@ -1359,6 +1361,11 @@ internal sealed class WmApplication
             var settings = _settingsProvider.Load();
             _settings = settings;
             _layoutOptions = settings.ToLayoutOptions();
+            _eligibilityOptions.ExcludedExecutableNames.Clear();
+            foreach (var executable in settings.ExcludedExecutables ?? [])
+            {
+                _eligibilityOptions.ExcludedExecutableNames.Add(executable);
+            }
             _log.Info("settings_loaded", new { settings.MasterRatio, settings.OuterGap, settings.InnerGap, settings.MasterCount });
         }
         catch (Exception exception) when (exception is IOException or JsonException or InvalidDataException or ArgumentOutOfRangeException or Tomlyn.TomlException)

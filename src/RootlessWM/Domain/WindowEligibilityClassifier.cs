@@ -21,7 +21,10 @@ public sealed class WindowEligibilityClassifier(WindowEligibilityOptions? option
         "TextInputHost",
         "SearchHost",
         "StartMenuExperienceHost",
-        "LockApp"
+        "LockApp",
+        // ShellExperienceHost renders toast notifications (e.g. Snipping Tool); ShellHost hosts newer shell flyouts.
+        "ShellExperienceHost",
+        "ShellHost"
     };
 
     private readonly WindowEligibilityOptions _options = options ?? new WindowEligibilityOptions();

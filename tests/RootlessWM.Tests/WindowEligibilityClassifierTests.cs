@@ -146,6 +146,8 @@ public sealed class WindowEligibilityClassifierTests
     [Theory]
     [InlineData("SearchHost")]
     [InlineData("StartMenuExperienceHost")]
+    [InlineData("ShellExperienceHost")]
+    [InlineData("ShellHost")]
     public void Classify_ShellHostProcess_ReturnsSystemWindow(string processName)
     {
         var classifier = new WindowEligibilityClassifier();

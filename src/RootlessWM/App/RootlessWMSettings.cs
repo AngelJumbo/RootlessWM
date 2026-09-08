@@ -14,7 +14,8 @@ public sealed record RootlessWMSettings(
     [property: JsonPropertyName("StatusBar")] WorkspaceBarSettings? WorkspaceBar = null,
     ToggleExplorerBehaviour ToggleExplorerBehaviour = ToggleExplorerBehaviour.TaskbarOnly,
     RunnerSettings? Runner = null,
-    bool HideExplorerOnStart = false)
+    bool HideExplorerOnStart = false,
+    IReadOnlyList<string>? ExcludedExecutables = null)
 {
     public static RootlessWMSettings Default { get; } = new(0.55, 0, 0);
 

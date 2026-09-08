@@ -19,6 +19,11 @@ toggle-explorer-behaviour = "TaskbarOnly"
 # starts with Explorer chrome already hidden (Alt+E / ToggleExplorer un-hides it).
 hide-explorer-on-start = false
 
+# Process names (no .exe suffix) to leave floating instead of tiling.
+# Useful for windows that auto-elevate (e.g. Task Manager on Windows 11): a non-elevated
+# RootlessWM cannot reposition them, so excluding them here avoids the wasted retile attempts.
+excluded-executables = ["Taskmgr"]
+
 # The bar is an ordered set of styled sections.
 [statusbar]
 visible = true

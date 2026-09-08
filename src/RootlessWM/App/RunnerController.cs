@@ -46,6 +46,7 @@ internal sealed class RunnerController : IDisposable
             return;
         }
 
+        _form.ResetQuery();
         _form.ShowOnFocusedMonitor();
     }
 
@@ -87,6 +88,12 @@ internal sealed class RunnerController : IDisposable
             _settings = settings;
             RefreshResults();
             Redraw();
+        }
+
+        public void ResetQuery()
+        {
+            _query = string.Empty;
+            _selectedIndex = 0;
         }
 
         public void ShowOnFocusedMonitor()
@@ -140,6 +147,7 @@ internal sealed class RunnerController : IDisposable
             {
                 case Keys.Escape:
                     Hide();
+                    ResetQuery();
                     break;
                 case Keys.Back:
                     if (_query.Length > 0)
@@ -214,6 +222,7 @@ internal sealed class RunnerController : IDisposable
                     UseShellExecute = true
                 });
                 Hide();
+                ResetQuery();
                 _log.Info("runner_launched", new { name = selected?.Name ?? target, source = selected?.Source ?? "command" });
             }
             catch (Win32Exception exception)
