@@ -8,4 +8,7 @@ internal interface IWidgetProvider
 
     /// <summary>Renders the current value. Called on the UI thread once per timer tick.</summary>
     string GetText();
+
+    IReadOnlyDictionary<string, string> GetValues()
+        => new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["output"] = GetText() };
 }

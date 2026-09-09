@@ -12,7 +12,10 @@ public sealed record WorkspaceBarOptions(
     WorkspaceBarTitleOptions Title,
     IReadOnlyList<WorkspaceBarWidgetOptions> Widgets,
     WorkspaceBarStyleOptions? Style = null,
-    IReadOnlyList<WorkspaceBarSectionOptions>? Sections = null)
+    IReadOnlyList<WorkspaceBarSectionOptions>? Sections = null,
+    IReadOnlyList<WorkspaceBarModuleOptions>? ModulesLeft = null,
+    IReadOnlyList<WorkspaceBarModuleOptions>? ModulesCenter = null,
+    IReadOnlyList<WorkspaceBarModuleOptions>? ModulesRight = null)
 {
     public WindowBounds ReserveTopSpace(WindowBounds workArea)
     {
@@ -109,4 +112,32 @@ public sealed record WorkspaceBarWidgetOptions(
     WorkspaceBarStyleOptions? Style = null)
 {
     public string Id { get; init; } = Kind;
+}
+
+public enum WorkspaceBarModuleMonitor
+{
+    All,
+    Primary,
+    Focused
+}
+
+public sealed record WorkspaceBarModuleOptions(
+    string Id,
+    string Type,
+    WorkspaceBarModuleMonitor Monitor,
+    WorkspaceBarStyleOptions Style,
+    string? Format = null,
+    string? Text = null,
+    string? Command = null,
+    int IntervalMilliseconds = 5000,
+    IReadOnlyList<string>? Labels = null,
+    IReadOnlyDictionary<MasterStackLayoutMode, string>? Symbols = null,
+    string? Symbol = null,
+    Color? ActiveBackground = null,
+    Color? ActiveForeground = null)
+{
+    public bool IsShownOn(bool isPrimary, bool isFocused)
+        => Monitor == WorkspaceBarModuleMonitor.All
+            || Monitor == WorkspaceBarModuleMonitor.Primary && isPrimary
+            || Monitor == WorkspaceBarModuleMonitor.Focused && isFocused;
 }

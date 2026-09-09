@@ -49,7 +49,7 @@ internal sealed class TomlSettingsProvider
             GetStringMap(table, "Hotkeys"),
             GetString(table, "Layout") ?? "MasterLeft",
             (int)(GetLong(table, "MasterCount") ?? 1),
-            MapWorkspaceBar(GetTable(table, "StatusBar")),
+            MapWorkspaceBar(GetTable(table, "StatusBar"), GetTable(table, "Module")),
             MapToggleExplorerBehaviour(GetString(table, "ToggleExplorerBehaviour") ?? "TaskbarOnly"),
             MapRunner(GetTable(table, "Runner")),
             GetBool(table, "HideExplorerOnStart") ?? false,
@@ -163,7 +163,7 @@ internal sealed class TomlSettingsProvider
             (int)(GetLong(table, "Padding") ?? 8));
     }
 
-    private static WorkspaceBarSettings? MapWorkspaceBar(TomlTable? table)
+    private static WorkspaceBarSettings? MapWorkspaceBar(TomlTable? table, TomlTable? moduleTable)
     {
         if (table is null)
         {
@@ -190,8 +190,46 @@ internal sealed class TomlSettingsProvider
             MapWorkspaceBarTitle(GetTable(table, "Title")),
             widgets,
             MapStyle(GetTable(table, "Style") ?? table),
-            MapSections(table));
+            MapSections(table),
+            GetStringList(table, "ModulesLeft"),
+            GetStringList(table, "ModulesCenter"),
+            GetStringList(table, "ModulesRight"),
+            MapModules(moduleTable));
     }
+
+    private static IReadOnlyDictionary<string, WorkspaceBarModuleSettings>? MapModules(TomlTable? table)
+    {
+        if (table is null)
+        {
+            return null;
+        }
+
+        var modules = new Dictionary<string, WorkspaceBarModuleSettings>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (id, value) in table)
+        {
+            if (value is TomlTable module)
+            {
+                modules[id] = MapModule(module);
+            }
+        }
+
+        return modules;
+    }
+
+    private static WorkspaceBarModuleSettings MapModule(TomlTable table)
+        => new(
+            GetString(table, "Type"),
+            GetString(table, "Monitor") ?? "all",
+            GetString(table, "Format"),
+            (int)(GetLong(table, "IntervalMilliseconds", "interval-ms") ?? 5000),
+            GetString(table, "Text"),
+            GetString(table, "Command"),
+            GetStringList(table, "Labels"),
+            GetStringMap(table, "Symbols"),
+            GetString(table, "Symbol"),
+            GetString(table, "ActiveBackground", "active-bg"),
+            GetString(table, "ActiveForeground", "active-fg"),
+            MapStyle(table));
 
     private static WorkspaceBarWorkspaceSettings? MapWorkspaceBarWorkspaces(TomlTable? table)
     {

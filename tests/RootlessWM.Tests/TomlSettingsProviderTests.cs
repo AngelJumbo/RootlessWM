@@ -287,6 +287,37 @@ public sealed class TomlSettingsProviderTests
     }
 
     [Fact]
+    public void Load_ModuleSyntax_MapsListsMonitorAndIndependentDefaults()
+    {
+        var path = Path.Combine(CreateTempDir(), "settings.toml");
+        File.WriteAllText(path, """
+            [statusbar]
+            background = "#101010"
+            color = "#D0D0D0"
+            modules-left = ["layout"]
+            modules-right = ["cpu"]
+
+            [module.layout]
+            type = "layout"
+            symbols = { MasterLeft = "ML" }
+
+            [module.cpu]
+            type = "cpu"
+            monitor = "primary"
+            format = "CPU {percent}%"
+            """);
+
+        var options = new TomlSettingsProvider(path).Load().ToWorkspaceBarOptions();
+
+        Assert.Equal("layout", options.ModulesLeft!.Single().Type);
+        Assert.Equal("cpu", options.ModulesRight!.Single().Type);
+        Assert.Equal(WorkspaceBarModuleMonitor.Primary, options.ModulesRight!.Single().Monitor);
+        Assert.Equal("CPU {percent}%", options.ModulesRight!.Single().Format);
+        Assert.Equal(Color.FromArgb(0, 0, 0, 0).ToArgb(), options.ModulesLeft!.Single().Style.Background.ToArgb());
+        Assert.Equal(0, options.ModulesLeft!.Single().Style.Padding.All);
+    }
+
+    [Fact]
     public void Load_ColorNaming_MapsColorAndCurrentColor()
     {
         var path = Path.Combine(CreateTempDir(), "settings.toml");

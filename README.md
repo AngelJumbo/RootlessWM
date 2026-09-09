@@ -150,20 +150,51 @@ The status bar accepts colors in `#RRGGBB` (opaque) or `#RRGGBBAA` (with alpha c
 | `border` | Table (`width`, `color`) | Border line thickness and color. |
 | `radius` | Integer | Corner rounding radius in pixels. |
 | `padding` | Table (`top`, `bottom`, `left`, `right`) | Outer padding around the bar content. |
-| `spacing` | Integer | Pixel spacing between layout sections. |
+| `spacing` | Integer | Pixel spacing between modules. |
 | `font` | Table (`family`, `size`, `weight`) | Global font properties for the bar text. |
 
-#### Status Bar Sections & Elements
+#### Status Bar Modules
 
-The bar layout is structured into ordered `[[statusbar.sections]]` matching specific IDs:
+The sections/widgets syntax was replaced by ordered module lists:
 
-| Section / Table | Key Settings | Description |
-| :--- | :--- | :--- |
-| `[[statusbar.sections]]` | `id`, `align`, `widgets`, `max-width` | Positions UI segments (`workspaces`, `layout`, `title`, `widgets`) to `left`, `center`, or `right`. |
-| `[statusbar.workspaces]` | `background`, `color`, `current-background`, `current-color`, `symbols` | Styles the workspace indicator and supplies custom workspace labels. |
-| `[statusbar.layout]` | `background`, `color`, `symbols` | Configures colors and custom short text for layout modes (`MasterLeft`, `MasterTop`, `monocle`, `floating`). |
-| `[statusbar.title]` | `background`, `color`, `current-background`, `current-color` | Styles the focused window title on the active monitor. |
-| `[[statusbar.widgets]]` | `id`, `kind`, `symbol`, `symbol-color`, `color`, `background`, `padding` | Configures built-in widgets (`cpu`, `memory`, `clock`, `date`, `uptime`, `battery`, `disk`, `network`, `text`, `command`). |
+```toml
+modules-left = ["workspaces", "layout"]
+modules-center = ["window-title"]
+modules-right = ["cpu", "memory", "clock"]
+
+[module.cpu]
+type = "cpu"
+monitor = "primary"
+format = "CPU {percent}%"
+```
+
+Module tables are top-level `[module.<id>]` tables. Supported module types are `workspaces`, `layout`, `window-title`, `cpu`, `memory`, `clock`, `date`, `uptime`, `battery`, `disk`, `network`, `text`, and `command`.
+
+`monitor` defaults to `all`; `primary` shows only on the primary monitor and `focused` only on the focused monitor. Only `color` and `font` inherit from `[statusbar]`. Module `background`, `padding`, `margin`, `radius`, and `border` default independently to transparent, zero, zero, zero, and no border.
+
+`format` is supported by data modules and `command`. 
+
+#### Built-in Module Values and Formats
+
+| Module | Format behavior | Default output / format | Supported values |
+| :--- | :--- | :--- | :--- |
+| `workspaces` | No `format` | Labels from `labels`, or `1` through `9` | Active state uses `active-bg` and `active-fg`. |
+| `layout` | No `format` | Configured `symbols` value, or built-in abbreviation | `MasterLeft`, `MasterTop`, `monocle`, `floating`. |
+| `window-title` | No `format` | Focused window title | `max-width` limits the title. Empty when unfocused. |
+| `cpu` | Yes | `{percent}%` | `{percent}` |
+| `memory` | Yes | `{used_percent}%` | `{used_percent}` |
+| `clock` | Yes | `{:%H:%M:%S}` | `{:%...}` date/time syntax. |
+| `date` | Yes | `{:%Y-%m-%d}` | `{:%...}` date/time syntax. |
+| `uptime` | Yes | `{days}d {hours}:{minutes}` | `{days}`, `{hours}`, `{minutes}`, `{seconds}`, `{total_seconds}` |
+| `battery` | Yes | `{percent}%{charging}` | `{percent}`, `{charging}`, `{ac_status}`. Empty when no battery exists. |
+| `disk` | Yes | `{output}` | `{root}`, `{used_percent}`, `{used_bytes}`, `{free_bytes}`, `{total_bytes}`, `{output}` |
+| `network` | Yes | `{output}` | `{download_bps}`, `{upload_bps}`, `{download_rate}`, `{upload_rate}`, `{output}` |
+| `text` | No `format` | Literal `text` value | Configured `text`, rendered unchanged. |
+| `command` | Yes | `{output}` | `{output}`, containing trimmed command output. |
+
+Date and clock formats use `{:%...}` with the supported date/time tokens. Numeric values use invariant formatting. Unknown placeholders remain unchanged.
+
+This is a breaking configuration change. Existing `[[statusbar.sections]]` and `[[statusbar.widgets]]` settings are deprecated; migrate them using `settings.example.toml`.
 
 #### Application Runner (`[runner]`)
 

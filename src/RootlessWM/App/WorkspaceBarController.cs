@@ -108,7 +108,8 @@ internal sealed class WorkspaceBarController : IDisposable
                 getCurrentWorkspace(monitor.Handle),
                 getLayoutMode(monitor.Handle),
                 monitor.Bounds,
-                _options.Height);
+                _options.Height,
+                monitor.IsPrimary);
         }
 
         RefreshWidgets();
@@ -153,6 +154,7 @@ internal sealed class WorkspaceBarController : IDisposable
         private int _currentWorkspace;
         private MasterStackLayoutMode _layoutMode;
         private bool _isFocused;
+        private bool _isPrimary;
         private string _focusedWindowTitle = string.Empty;
 
         public WorkspaceBarView(int workspaceCount, WorkspaceBarWidgetRegistry widgetRegistry, ConsoleDiagnosticLog log)
@@ -194,7 +196,8 @@ internal sealed class WorkspaceBarController : IDisposable
             int currentWorkspace,
             MasterStackLayoutMode layoutMode,
             WindowBounds workArea,
-            int height)
+            int height,
+            bool isPrimary)
         {
             var margin = new Padding(
                 Math.Max(0, _barStyle.Margin.Left),
@@ -234,6 +237,7 @@ internal sealed class WorkspaceBarController : IDisposable
             }
             _currentWorkspace = currentWorkspace;
             _layoutMode = layoutMode;
+            _isPrimary = isPrimary;
             Redraw();
         }
 
@@ -275,11 +279,124 @@ internal sealed class WorkspaceBarController : IDisposable
             var barRect = new SKRect(0, 0, width, height);
             DrawBox(canvas, barRect, _barStyle);
             var content = Inset(barRect, _barStyle.Padding, _barStyle.BorderWidth);
+            if (_options.ModulesLeft is not null || _options.ModulesCenter is not null || _options.ModulesRight is not null)
+            {
+                DrawModuleGroup(canvas, content, _options.ModulesLeft ?? [], WorkspaceBarSectionAlignment.Left);
+                DrawModuleGroup(canvas, content, _options.ModulesRight ?? [], WorkspaceBarSectionAlignment.Right);
+                DrawModuleGroup(canvas, content, _options.ModulesCenter ?? [], WorkspaceBarSectionAlignment.Center);
+                return;
+            }
+
             var sections = (_options.Sections ?? []).Where(section => section.Style.Visible).ToList();
             DrawSections(canvas, content, sections.Where(section => section.Alignment == WorkspaceBarSectionAlignment.Left).ToList(), WorkspaceBarSectionAlignment.Left);
             DrawSections(canvas, content, sections.Where(section => section.Alignment == WorkspaceBarSectionAlignment.Right).ToList(), WorkspaceBarSectionAlignment.Right);
             DrawSections(canvas, content, sections.Where(section => section.Alignment == WorkspaceBarSectionAlignment.Center).ToList(), WorkspaceBarSectionAlignment.Center);
         }
+
+        private void DrawModuleGroup(SKCanvas canvas, SKRect content, IReadOnlyList<WorkspaceBarModuleOptions> modules, WorkspaceBarSectionAlignment alignment)
+        {
+            var visible = modules.Where(module => module.Style.Visible && module.IsShownOn(_isPrimary, _isFocused)).ToList();
+            var widths = visible.Select(MeasureModule).ToList();
+            var totalWidth = widths.Sum() + Math.Max(0, widths.Count - 1) * _barStyle.Spacing;
+            var x = alignment switch
+            {
+                WorkspaceBarSectionAlignment.Right => content.Right - totalWidth,
+                WorkspaceBarSectionAlignment.Center => content.Left + Math.Max(0, (content.Width - totalWidth) / 2F),
+                _ => content.Left
+            };
+
+            for (var index = 0; index < visible.Count; index++)
+            {
+                var module = visible[index];
+                var width = Math.Min(widths[index], Math.Max(0, content.Right - x));
+                var rect = new SKRect(x, content.Top, x + width, content.Bottom);
+                DrawModule(canvas, module, rect, alignment);
+                x += width + _barStyle.Spacing;
+            }
+        }
+
+        private float MeasureModule(WorkspaceBarModuleOptions module)
+        {
+            var text = string.Equals(module.Type, "layout", StringComparison.OrdinalIgnoreCase)
+                ? GetLayoutText(module)
+                : GetModuleText(module);
+            var width = module.Type.ToLowerInvariant() switch
+            {
+                "workspaces" => MeasureWorkspaces(module),
+                _ => MeasureText(text, module.Style)
+            };
+            width += module.Style.Padding.Left + module.Style.Padding.Right + module.Style.Margin.Left + module.Style.Margin.Right + module.Style.BorderWidth * 2;
+            if (module.Style.MinWidth is int minWidth)
+            {
+                width = Math.Max(width, minWidth);
+            }
+
+            return module.Style.MaxWidth is int maxWidth ? Math.Min(width, maxWidth) : width;
+        }
+
+        private void DrawModule(SKCanvas canvas, WorkspaceBarModuleOptions module, SKRect rect, WorkspaceBarSectionAlignment alignment)
+        {
+            var adjusted = new SKRect(rect.Left + module.Style.Margin.Left, rect.Top, rect.Right - module.Style.Margin.Right, rect.Bottom);
+            DrawBox(canvas, adjusted, module.Style);
+            var content = Inset(adjusted, module.Style.Padding, module.Style.BorderWidth);
+            switch (module.Type.ToLowerInvariant())
+            {
+                case "workspaces":
+                    DrawWorkspaces(canvas, content, module);
+                    break;
+                case "layout":
+                    DrawText(canvas, GetLayoutText(module), content, module.Style.Foreground, module.Style, SKTextAlign.Center);
+                    break;
+                case "window-title":
+                    if (_isFocused)
+                    {
+                        DrawText(canvas, _focusedWindowTitle, content, module.Style.Foreground, module.Style, alignment == WorkspaceBarSectionAlignment.Right ? SKTextAlign.Right : SKTextAlign.Left, ellipsis: true);
+                    }
+                    break;
+                default:
+                    DrawText(canvas, GetModuleText(module), content, module.Style.Foreground, module.Style, SKTextAlign.Left);
+                    break;
+            }
+        }
+
+        private void DrawWorkspaces(SKCanvas canvas, SKRect rect, WorkspaceBarModuleOptions module)
+        {
+            var labels = module.Labels ?? [];
+            var x = rect.Left;
+            for (var index = 0; index < WorkspaceCount; index++)
+            {
+                var text = labels.Count > index ? labels[index] : (index + 1).ToString();
+                var textWidth = MeasureText(text, module.Style);
+                var itemRect = new SKRect(x, rect.Top, x + textWidth + 8, rect.Bottom);
+                var active = index == _currentWorkspace;
+                DrawFill(canvas, itemRect, active ? module.ActiveBackground ?? module.Style.Background : module.Style.Background, module.Style.BorderRadius);
+                DrawText(canvas, text, itemRect, active ? module.ActiveForeground ?? module.Style.Foreground : module.Style.Foreground, module.Style, SKTextAlign.Center);
+                x = itemRect.Right + 4;
+            }
+        }
+
+        private float MeasureWorkspaces(WorkspaceBarModuleOptions module)
+            => Enumerable.Range(0, WorkspaceCount)
+                .Sum(index => MeasureText(module.Labels is { Count: > 0 } labels && labels.Count > index ? labels[index] : (index + 1).ToString(), module.Style) + 12);
+
+        private string GetModuleText(WorkspaceBarModuleOptions module)
+        {
+            if (string.Equals(module.Type, "window-title", StringComparison.OrdinalIgnoreCase))
+            {
+                return _isFocused ? _focusedWindowTitle : string.Empty;
+            }
+
+            var provider = GetOrCreateProvider(GetModuleIndex(module), new WorkspaceBarWidgetOptions(module.Type, module.Symbol ?? "", Color.Transparent, module.Style.Foreground, module.Style.Background, module.Style.Foreground, module.Text ?? "", module.Command ?? "", module.IntervalMilliseconds, module.Style) { Id = module.Id });
+            var values = provider?.GetValues() ?? new Dictionary<string, string>();
+            return WorkspaceBarFormat.Format(module.Type, module.Format, values);
+        }
+
+        private int GetModuleIndex(WorkspaceBarModuleOptions module)
+            => (_options.ModulesLeft ?? []).Concat(_options.ModulesCenter ?? []).Concat(_options.ModulesRight ?? [])
+                .ToList().FindIndex(candidate => string.Equals(candidate.Id, module.Id, StringComparison.OrdinalIgnoreCase));
+
+        private string GetLayoutText(WorkspaceBarModuleOptions module)
+            => module.Symbols?.TryGetValue(_layoutMode, out var symbol) == true ? symbol : FormatLayoutMode(_layoutMode);
 
         private void DrawSections(SKCanvas canvas, SKRect content, IReadOnlyList<WorkspaceBarSectionOptions> sections, WorkspaceBarSectionAlignment alignment)
         {

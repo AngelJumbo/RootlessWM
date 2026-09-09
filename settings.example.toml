@@ -24,147 +24,75 @@ hide-explorer-on-start = false
 # RootlessWM cannot reposition them, so excluding them here avoids the wasted retile attempts.
 excluded-executables = ["Taskmgr"]
 
-# The bar is an ordered set of styled sections.
 [statusbar]
 visible = true
 height = 28
 # Colors support #RRGGBB (opaque) and #RRGGBBAA (alpha). 00 is transparent; FF is opaque.
 background = "#1e1e2e"
+color = "#cdd6f4"
 border = { width = 1, color = "#45475a" }
 radius = 6
 padding = { top = 2, right = 8, bottom = 2, left = 8 }
 spacing = 6
 font = { family = "Cascadia Mono", size = 12, weight = "bold" }
+modules-left = ["workspaces", "layout"]
+modules-center = ["window-title"]
+modules-right = ["cpu", "memory", "clock"]
 
-[[statusbar.sections]]
-id = "workspaces"
-align = "left"
+[module.workspaces]
+type = "workspaces"
+labels = ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
+active-bg = "#cba6f7"
+active-fg = "#1e1e2e"
 background = "#313244"
 padding = { left = 4, right = 4 }
 
-[[statusbar.sections]]
-id = "layout"
-align = "left"
+[module.layout]
+type = "layout"
+symbols = { MasterLeft = "ML", MasterTop = "MT", monocle = "MON", floating = "FLT" }
 
-[[statusbar.sections]]
-id = "title"
-align = "center"
-color = "#cdd6f4"
-# background = "#1e1e2ec0" # 75% opaque: windows behind this section show through.
+[module.window-title]
+type = "window-title"
+monitor = "focused"
 max-width = 700
+color = "#a6adc8"
 
-[[statusbar.sections]]
-id = "widgets"
-align = "right"
-widgets = ["cpu", "memory", "clock"]
+[module.cpu]
+type = "cpu"
+monitor = "primary"
+format = "CPU {percent}%"
+interval-ms = 2000
+background = "#181825"
+border = { width = 1, color = "#f38ba8" }
+radius = 6
+padding = { left = 6, right = 6 }
+margin = { left = 4 }
 
-[statusbar.workspaces]
-background = "#313244"
-color = "#cdd6f4"
-current-background = "#cba6f7"
-current-color = "#1e1e2e"
-symbols = ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
+[module.memory]
+type = "memory"
+monitor = "primary"
+format = "MEM {used_percent}%"
+color = "#fab387"
 
-[statusbar.layout]
-background = "#1e1e2e"
-color = "#cdd6f4"
+[module.clock]
+type = "clock"
+monitor = "primary"
+format = "{:%H:%M:%S}"
+font = { family = "Cascadia Mono", size = 13, weight = "normal" }
 
-[statusbar.layout.symbols]
-MasterLeft = "ML"
-MasterTop = "MT"
-monocle = "MON"
-floating = "FLT"
-
-[statusbar.title]
-background = "#1e1e2e"
-current-background = "#1e1e2e"
-current-color = "#cdd6f4"
-
-# Each widget is a record. IDs are used by section widgets lists.
-[[statusbar.widgets]]
-id = "cpu"
-kind = "cpu"
-symbol = "CPU"
-symbol-color = "#f38ba8"
-color = "#cdd6f4"
-background = "#1e1e2e"
-padding = { left = 4, right = 4 }
-
-[[statusbar.widgets]]
-id = "memory"
-kind = "memory"
-symbol = "MEM"
-symbol-color = "#fab387"
-color = "#cdd6f4"
-background = "#1e1e2e"
-padding = { left = 4, right = 4 }
-
-[[statusbar.widgets]]
-id = "clock"
-kind = "clock"
-color = "#cdd6f4"
-background = "#1e1e2e"
-padding = { left = 4, right = 4 }
-
-# Built-in widget reference
-# Uncomment a record and add its ID to the widgets section above.
-# Available kinds: cpu, memory, clock, date, uptime, battery, disk, network, text.
-
-# [[statusbar.widgets]]
-# id = "date"
-# kind = "date"
-# symbol = "DATE"
-# symbol-color = "#89b4fa"
-# color = "#cdd6f4"
-# background = "#1e1e2e"
-
-# [[statusbar.widgets]]
-# id = "uptime"
-# kind = "uptime"
-# symbol = "UP"
-# symbol-color = "#89dceb"
-# color = "#cdd6f4"
-# background = "#1e1e2e"
-
-# [[statusbar.widgets]]
-# id = "battery"
-# kind = "battery"
-# symbol = "BAT"
-# symbol-color = "#a6e3a1"
-# color = "#cdd6f4"
-# background = "#1e1e2e"
-
-# [[statusbar.widgets]]
-# id = "disk"
-# kind = "disk"
-# symbol = "DISK"
-# symbol-color = "#f9e2af"
-# color = "#cdd6f4"
-# background = "#1e1e2e"
-
-# [[statusbar.widgets]]
-# id = "network"
-# kind = "network"
-# symbol = "NET"
-# symbol-color = "#94e2d5"
-# color = "#cdd6f4"
-# background = "#1e1e2e"
-
-# Static text widget; use it for labels or separators.
-# [[statusbar.widgets]]
-# id = "separator"
-# kind = "text"
+# Data modules support type-specific format placeholders documented in docs/statusbarModules.md.
+# Built-in data types: date, uptime, battery, disk, and network.
+# Example literal text module (no format property):
+# [module.separator]
+# type = "text"
 # text = " | "
-# color = "#6c7086"
-# background = "#1e1e2e"
 
-# Example user-defined command widget:
-# [[statusbar.widgets]]
-# id = "vpn"
-# kind = "command"
-# symbol = "VPN"
+# Example command module. Command supports format = "VPN {output}".
+# [module.vpn]
+# type = "command"
 # command = "powershell -NoProfile -Command \"(Get-NetAdapter | Where-Object Status -eq 'Up').Name\""
 # interval-ms = 5000
+# format = "VPN {output}"
 # color = "#a6e3a1"
 
 # Built-in app runner configuration.

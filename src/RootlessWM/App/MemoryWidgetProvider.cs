@@ -14,4 +14,14 @@ internal sealed class MemoryWidgetProvider : IWidgetProvider
     public string Key => "memory";
 
     public string GetText() => $" {_metricsSampler.SampleMemoryUsagePercent():0}%";
+
+    public IReadOnlyDictionary<string, string> GetValues()
+    {
+        var percent = _metricsSampler.SampleMemoryUsagePercent();
+        return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["used_percent"] = percent.ToString("0", System.Globalization.CultureInfo.InvariantCulture),
+            ["output"] = $" {percent:0}%"
+        };
+    }
 }

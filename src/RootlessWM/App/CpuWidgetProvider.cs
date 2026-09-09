@@ -14,4 +14,14 @@ internal sealed class CpuWidgetProvider : IWidgetProvider
     public string Key => "cpu";
 
     public string GetText() => $" {_metricsSampler.SampleCpuUsagePercent():0}%";
+
+    public IReadOnlyDictionary<string, string> GetValues()
+    {
+        var percent = _metricsSampler.SampleCpuUsagePercent();
+        return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["percent"] = percent.ToString("0", System.Globalization.CultureInfo.InvariantCulture),
+            ["output"] = $" {percent:0}%"
+        };
+    }
 }

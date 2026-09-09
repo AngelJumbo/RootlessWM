@@ -44,6 +44,14 @@ public sealed record RootlessWMSettings(
         var title = bar.Title ?? WorkspaceBarTitleSettings.Default;
         var widgets = bar.Widgets ?? WorkspaceBarWidgetsSettings.Default;
         var style = ParseStyle(bar.Style, ParseColor(bar.Background, nameof(bar.Background)));
+        var modules = bar.Modules ?? new Dictionary<string, WorkspaceBarModuleSettings>(StringComparer.OrdinalIgnoreCase);
+        var moduleOptions = modules.ToDictionary(
+            pair => pair.Key,
+            pair => BuildModuleOption(pair.Key, pair.Value, style),
+            StringComparer.OrdinalIgnoreCase);
+
+        IReadOnlyList<WorkspaceBarModuleOptions> BuildModules(IReadOnlyList<string>? ids)
+            => (ids ?? []).Where(moduleOptions.ContainsKey).Select(id => moduleOptions[id]).ToList();
 
         return new WorkspaceBarOptions(
             bar.Visible,
@@ -65,8 +73,51 @@ public sealed record RootlessWMSettings(
                 ParseColor(title.CurrentForeground, nameof(title.CurrentForeground))),
             BuildWidgetOptions(widgets, style),
             style,
-            BuildSections(bar.Sections, style));
+            BuildSections(bar.Sections, style),
+            bar.Modules is null ? null : BuildModules(bar.ModulesLeft),
+            bar.Modules is null ? null : BuildModules(bar.ModulesCenter),
+            bar.Modules is null ? null : BuildModules(bar.ModulesRight));
     }
+
+    private static WorkspaceBarModuleOptions BuildModuleOption(string id, WorkspaceBarModuleSettings module, WorkspaceBarStyleOptions barStyle)
+    {
+        if (!Enum.TryParse<WorkspaceBarModuleMonitor>(module.Monitor ?? "all", true, out var monitor))
+        {
+            throw new ArgumentOutOfRangeException(nameof(module.Monitor), module.Monitor, "The status bar module monitor must be all, primary, or focused.");
+        }
+
+        var type = module.Type ?? id;
+        var style = ParseModuleStyle(module.Style, barStyle);
+        return new WorkspaceBarModuleOptions(
+            id,
+            type,
+            monitor,
+            style,
+            module.Format ?? DefaultModuleFormat(type),
+            module.Text,
+            module.Command,
+            Math.Clamp(module.IntervalMilliseconds, 250, 3600000),
+            module.Labels,
+            ParseLayoutSymbols(module.Symbols),
+            module.Symbol,
+            module.ActiveBackground is null ? null : ParseColor(module.ActiveBackground, nameof(module.ActiveBackground)),
+            module.ActiveForeground is null ? null : ParseColor(module.ActiveForeground, nameof(module.ActiveForeground)));
+    }
+
+    private static string? DefaultModuleFormat(string type)
+        => type.ToLowerInvariant() switch
+        {
+            "cpu" => "{percent}%",
+            "memory" => "{used_percent}%",
+            "clock" => "{:%H:%M:%S}",
+            "date" => "{:%Y-%m-%d}",
+                "uptime" => "{days}d {hours}:{minutes}",
+            "battery" => "{output}",
+            "disk" => "{output}",
+            "network" => "{output}",
+            "command" => "{output}",
+            _ => null
+        };
 
     private static IReadOnlyDictionary<MasterStackLayoutMode, string> ParseLayoutSymbols(
         IReadOnlyDictionary<string, string>? symbols)
@@ -153,6 +204,40 @@ public sealed record RootlessWMSettings(
     private static WorkspaceBarStyleOptions ParseStyle(WorkspaceBarStyleSettings? style, Color fallbackBackground)
         => ParseStyle(style, WorkspaceBarStyleOptions.Default with { Background = fallbackBackground });
 
+    private static WorkspaceBarStyleOptions ParseModuleStyle(WorkspaceBarStyleSettings? style, WorkspaceBarStyleOptions barStyle)
+    {
+        style ??= new WorkspaceBarStyleSettings();
+        return ParseStyle(
+            style with
+            {
+                Color = style.Color ?? ColorTranslator.ToHtml(barStyle.Foreground),
+                Background = style.Background ?? "#00000000",
+                BorderWidth = style.BorderWidth ?? 0,
+                BorderColor = style.BorderColor ?? "#00000000",
+                Radius = style.Radius ?? 0,
+                PaddingTop = style.PaddingTop ?? 0,
+                PaddingRight = style.PaddingRight ?? 0,
+                PaddingBottom = style.PaddingBottom ?? 0,
+                PaddingLeft = style.PaddingLeft ?? 0,
+                MarginTop = style.MarginTop ?? 0,
+                MarginRight = style.MarginRight ?? 0,
+                MarginBottom = style.MarginBottom ?? 0,
+                MarginLeft = style.MarginLeft ?? 0,
+                Spacing = style.Spacing ?? 0,
+                FontFamily = style.FontFamily ?? barStyle.FontFamily,
+                FontSize = style.FontSize ?? barStyle.FontSize,
+                Weight = style.Weight ?? (barStyle.FontStyle.HasFlag(FontStyle.Bold) ? "bold" : "normal"),
+                Italic = style.Italic ?? barStyle.FontStyle.HasFlag(FontStyle.Italic)
+            },
+            WorkspaceBarStyleOptions.Default with
+            {
+                Foreground = barStyle.Foreground,
+                FontFamily = barStyle.FontFamily,
+                FontSize = barStyle.FontSize,
+                FontStyle = barStyle.FontStyle
+            }) with { Foreground = barStyle.Foreground };
+    }
+
     private static WorkspaceBarStyleOptions ParseStyle(WorkspaceBarStyleSettings? style, WorkspaceBarStyleOptions fallback)
     {
         style ??= new WorkspaceBarStyleSettings();
@@ -234,7 +319,11 @@ public sealed record WorkspaceBarSettings(
     WorkspaceBarTitleSettings? Title = null,
     WorkspaceBarWidgetsSettings? Widgets = null,
     WorkspaceBarStyleSettings? Style = null,
-    IReadOnlyList<WorkspaceBarSectionSettings>? Sections = null)
+    IReadOnlyList<WorkspaceBarSectionSettings>? Sections = null,
+    IReadOnlyList<string>? ModulesLeft = null,
+    IReadOnlyList<string>? ModulesCenter = null,
+    IReadOnlyList<string>? ModulesRight = null,
+    IReadOnlyDictionary<string, WorkspaceBarModuleSettings>? Modules = null)
 {
     public static WorkspaceBarSettings Default { get; } = new();
 }
@@ -317,6 +406,20 @@ public sealed record WorkspaceBarSectionSettings(
     string Align = "left",
     WorkspaceBarStyleSettings? Style = null,
     IReadOnlyList<string>? Widgets = null);
+
+public sealed record WorkspaceBarModuleSettings(
+    string? Type = null,
+    string? Monitor = null,
+    string? Format = null,
+    int IntervalMilliseconds = 5000,
+    string? Text = null,
+    string? Command = null,
+    IReadOnlyList<string>? Labels = null,
+    IReadOnlyDictionary<string, string>? Symbols = null,
+    string? Symbol = null,
+    string? ActiveBackground = null,
+    string? ActiveForeground = null,
+    WorkspaceBarStyleSettings? Style = null);
 
 public sealed record RunnerSettings(
     bool Enabled = true,
