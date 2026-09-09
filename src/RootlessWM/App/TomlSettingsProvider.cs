@@ -7,7 +7,6 @@ namespace RootlessWM.App;
 internal sealed class TomlSettingsProvider
 {
     private readonly string _filePath;
-    private readonly JsonSettingsProvider _jsonFallback;
 
     public TomlSettingsProvider()
         : this(Path.Combine(
@@ -20,14 +19,13 @@ internal sealed class TomlSettingsProvider
     internal TomlSettingsProvider(string filePath)
     {
         _filePath = filePath;
-        _jsonFallback = new JsonSettingsProvider(Path.Combine(Path.GetDirectoryName(filePath)!, "settings.json"));
     }
 
     public RootlessWMSettings Load()
     {
         if (!File.Exists(_filePath))
         {
-            return _jsonFallback.Load();
+            return RootlessWMSettings.Default;
         }
 
         var model = TomlSerializer.Deserialize<TomlTable>(File.ReadAllText(_filePath));

@@ -209,26 +209,6 @@ public sealed class TomlSettingsProviderTests
     }
 
     [Fact]
-    public void Load_MissingToml_FallsBackToJson()
-    {
-        var dir = CreateTempDir();
-        var jsonPath = Path.Combine(dir, "settings.json");
-        File.WriteAllText(jsonPath, """
-            {
-              "MasterRatio": 0.7,
-              "OuterGap": 4,
-              "InnerGap": 4
-            }
-            """);
-
-        var settings = new TomlSettingsProvider(Path.Combine(dir, "settings.toml")).Load();
-
-        Assert.Equal(0.7, settings.MasterRatio);
-        Assert.Equal(4, settings.OuterGap);
-        Assert.Equal(4, settings.InnerGap);
-    }
-
-    [Fact]
     public void Load_SectionsNestedStyleAndCommandWidget()
     {
         var path = Path.Combine(CreateTempDir(), "settings.toml");
