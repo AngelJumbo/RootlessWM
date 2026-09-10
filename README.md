@@ -216,7 +216,7 @@ The built-in launcher provides quick access to installed executables.
 
 #### Default Hotkey Bindings (`[Hotkeys]`)
 
-Hotkeys support combinations of modifier keys (`Alt`, `Ctrl`, `Shift`) alongside letters, digits, `Space`, or `Escape`.
+Hotkeys support combinations of modifier keys (`Alt`, `Ctrl`, `Shift`, `Win`/`Super`) alongside letters, digits, `Space`, `Escape` or `Enter`/`Return`.
 
 | Action | Shortcut | Description |
 | :--- | :--- | :--- |

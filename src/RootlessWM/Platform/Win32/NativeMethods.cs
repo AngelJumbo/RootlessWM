@@ -51,6 +51,7 @@ internal static class NativeMethods
     internal const uint ModAlt = 0x0001;
     internal const uint ModControl = 0x0002;
     internal const uint ModShift = 0x0004;
+    internal const uint ModWin = 0x0008;
     internal const uint VkJ = 0x4A;
     internal const uint VkK = 0x4B;
     internal const uint Vk1 = 0x31;
@@ -76,6 +77,7 @@ internal static class NativeMethods
     internal const uint VkQ = 0x51;
     internal const uint VkR = 0x52;
     internal const uint VkE = 0x45;
+    internal const uint VkEnter = 0x0D;
     internal const uint VkEscape = 0x1B;
     internal const uint VkSpace = 0x20;
     internal const uint AttachParentProcess = 0xFFFFFFFF;

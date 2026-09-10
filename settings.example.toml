@@ -80,7 +80,7 @@ monitor = "primary"
 format = "{:%H:%M:%S}"
 font = { family = "Cascadia Mono", size = 13, weight = "normal" }
 
-# Data modules support type-specific format placeholders documented in docs/statusbarModules.md.
+# Data modules support type-specific format placeholders documented in README.md.
 # Built-in data types: date, uptime, battery, disk, and network.
 # Example literal text module (no format property):
 # [module.separator]

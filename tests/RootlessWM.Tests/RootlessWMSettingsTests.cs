@@ -1,6 +1,8 @@
 using RootlessWM.App;
 using RootlessWM.Domain;
+using RootlessWM.Platform.Win32;
 using System.Drawing;
+using System.Reflection;
 using Xunit;
 
 namespace RootlessWM.Tests;
@@ -87,6 +89,24 @@ public sealed class RootlessWMSettingsTests
         Assert.Equal(800, settings.Runner.Window.Width);
         Assert.Equal("#123456", settings.Runner.Style.Background);
         Assert.Equal("run", settings.Runner.Input.Prompt);
+    }
+
+    [Theory]
+    [InlineData("Super+Enter")]
+    [InlineData("Win+Enter")]
+    [InlineData("Alt+Super+Enter")]
+    public void TryParseBinding_SupportsSuperAndEnter(string binding)
+    {
+        var method = typeof(GlobalHotkeySource).GetMethod("TryParseBinding", BindingFlags.NonPublic | BindingFlags.Static);
+
+        Assert.NotNull(method);
+
+        var parameters = new object?[] { binding, 0u, 0u };
+        var result = (bool)method!.Invoke(null, parameters)!;
+
+        Assert.True(result);
+        Assert.NotEqual((uint)0, (uint)parameters[1]!);
+        Assert.Equal((uint)NativeMethods.VkEnter, (uint)parameters[2]!);
     }
 
     [Fact]

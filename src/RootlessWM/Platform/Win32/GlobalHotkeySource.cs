@@ -104,24 +104,35 @@ internal sealed class GlobalHotkeySource : IDisposable
 
         foreach (var modifier in parts[..^1])
         {
-            modifiers |= modifier.ToUpperInvariant() switch
+            var normalized = modifier.ToUpperInvariant();
+            uint modifierValue = normalized switch
             {
                 "ALT" => NativeMethods.ModAlt,
                 "CTRL" or "CONTROL" => NativeMethods.ModControl,
                 "SHIFT" => NativeMethods.ModShift,
+                "SUPER" or "WIN" => NativeMethods.ModWin,
                 _ => 0
             };
 
-            if (modifier is not ("Alt" or "ALT" or "Ctrl" or "CTRL" or "Control" or "CONTROL" or "Shift" or "SHIFT"))
+            if (modifierValue == 0)
             {
                 return false;
             }
+
+            modifiers |= modifierValue;
         }
 
         var key = parts[^1];
         if (key.Length == 1 && (char.IsLetter(key[0]) || char.IsDigit(key[0])))
         {
             virtualKey = (uint)char.ToUpperInvariant(key[0]);
+            return modifiers != 0;
+        }
+
+        if (string.Equals(key, "Enter", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(key, "Return", StringComparison.OrdinalIgnoreCase))
+        {
+            virtualKey = NativeMethods.VkEnter;
             return modifiers != 0;
         }
 
