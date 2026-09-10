@@ -101,7 +101,8 @@ public sealed record RootlessWMSettings(
             ParseLayoutSymbols(module.Symbols),
             module.Symbol,
             module.ActiveBackground is null ? null : ParseColor(module.ActiveBackground, nameof(module.ActiveBackground)),
-            module.ActiveForeground is null ? null : ParseColor(module.ActiveForeground, nameof(module.ActiveForeground)));
+            module.ActiveForeground is null ? null : ParseColor(module.ActiveForeground, nameof(module.ActiveForeground)),
+            string.Equals(type, "battery", StringComparison.OrdinalIgnoreCase) ? module.Symbols : null);
     }
 
     private static string? DefaultModuleFormat(string type)

@@ -47,6 +47,11 @@ internal sealed class WorkspaceBarWidgetRegistry
             return new CommandWidgetProvider(options.Command, options.IntervalMilliseconds);
         }
 
+        if (string.Equals(key, "battery", StringComparison.OrdinalIgnoreCase))
+        {
+            return new BatteryWidgetProvider(new BatteryMetricsSampler(), options.Symbol, options.BatterySymbols);
+        }
+
         return TryGet(key, out var provider) ? provider : null;
     }
 }

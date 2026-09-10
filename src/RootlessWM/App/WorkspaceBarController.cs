@@ -386,7 +386,7 @@ internal sealed class WorkspaceBarController : IDisposable
                 return _isFocused ? _focusedWindowTitle : string.Empty;
             }
 
-            var provider = GetOrCreateProvider(GetModuleIndex(module), new WorkspaceBarWidgetOptions(module.Type, module.Symbol ?? "", Color.Transparent, module.Style.Foreground, module.Style.Background, module.Style.Foreground, module.Text ?? "", module.Command ?? "", module.IntervalMilliseconds, module.Style) { Id = module.Id });
+            var provider = GetOrCreateProvider(GetModuleIndex(module), new WorkspaceBarWidgetOptions(module.Type, module.Symbol ?? "", Color.Transparent, module.Style.Foreground, module.Style.Background, module.Style.Foreground, module.Text ?? "", module.Command ?? "", module.IntervalMilliseconds, module.Style) { Id = module.Id, BatterySymbols = module.BatterySymbols });
             var values = provider?.GetValues() ?? new Dictionary<string, string>();
             return WorkspaceBarFormat.Format(module.Type, module.Format, values);
         }
@@ -640,7 +640,7 @@ internal sealed class WorkspaceBarController : IDisposable
 
         private IWidgetProvider? GetOrCreateProvider(int index, WorkspaceBarWidgetOptions widget)
         {
-            var signature = $"{widget.Kind}\n{widget.Text}\n{widget.Command}\n{widget.IntervalMilliseconds}";
+            var signature = $"{widget.Kind}\n{widget.Symbol}\n{widget.BatterySymbols?.Count}\n{widget.Text}\n{widget.Command}\n{widget.IntervalMilliseconds}";
             while (_widgetProviders.Count <= index)
             {
                 _widgetProviders.Add((string.Empty, null!));

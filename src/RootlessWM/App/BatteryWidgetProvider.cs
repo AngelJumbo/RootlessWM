@@ -5,10 +5,19 @@ namespace RootlessWM.App;
 internal sealed class BatteryWidgetProvider : IWidgetProvider
 {
     private readonly BatteryMetricsSampler _batterySampler;
+    private readonly string _chargingGlyph;
+    private readonly IReadOnlyDictionary<string, string> _batterySymbols;
 
-    public BatteryWidgetProvider(BatteryMetricsSampler batterySampler)
+    public BatteryWidgetProvider(
+        BatteryMetricsSampler batterySampler,
+        string? chargingGlyph = null,
+        IReadOnlyDictionary<string, string>? batterySymbols = null)
     {
         _batterySampler = batterySampler;
+        _batterySymbols = batterySymbols ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        _chargingGlyph = _batterySymbols.TryGetValue("charging", out var configuredChargingGlyph)
+            ? configuredChargingGlyph
+            : string.IsNullOrEmpty(chargingGlyph) ? "⚡" : chargingGlyph;
     }
 
     public string Key => "battery";
@@ -27,8 +36,8 @@ internal sealed class BatteryWidgetProvider : IWidgetProvider
             return string.Empty;
         }
 
-        var charging = status.Value.ACLineStatus == 1 ? " ⚡" : string.Empty;
-        return $" {percent}%{charging}";
+        var charging = GetChargingText(status.Value.ACLineStatus);
+        return $" {percent}%{FormatChargingSuffix(charging)}";
     }
 
     public IReadOnlyDictionary<string, string> GetValues()
@@ -40,13 +49,35 @@ internal sealed class BatteryWidgetProvider : IWidgetProvider
         }
 
         var percent = status.Value.BatteryLifePercent.ToString();
-        var charging = status.Value.ACLineStatus == 1 ? " ⚡" : string.Empty;
+        var batterySymbol = GetBatterySymbol(status.Value.BatteryLifePercent);
+        var charging = GetChargingText(status.Value.ACLineStatus);
         return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["percent"] = percent,
+            ["battery_symbol"] = batterySymbol,
             ["charging"] = charging,
             ["ac_status"] = status.Value.ACLineStatus == 1 ? "online" : "offline",
-            ["output"] = $" {percent}%{charging}"
+            ["output"] = $" {percent}%{FormatChargingSuffix(charging)}"
         };
     }
+
+    private string GetBatterySymbol(byte percent)
+    {
+        var state = percent switch
+        {
+            0 => "batteryEmpty",
+            <= 25 => "batteryQuarter",
+            <= 50 => "batteryHalf",
+            <= 75 => "batteryThreeQuarters",
+            _ => "batteryFull"
+        };
+
+        return _batterySymbols.TryGetValue(state, out var symbol) ? symbol : string.Empty;
+    }
+
+    private string GetChargingText(byte acLineStatus)
+        => acLineStatus == 1 ? _chargingGlyph : string.Empty;
+
+    private static string FormatChargingSuffix(string charging)
+        => string.IsNullOrEmpty(charging) ? string.Empty : $" {charging}";
 }

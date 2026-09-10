@@ -295,7 +295,7 @@ public sealed class TomlSettingsProviderTests
             background = "#101010"
             color = "#D0D0D0"
             modules-left = ["layout"]
-            modules-right = ["cpu"]
+            modules-right = ["cpu", "battery"]
 
             [module.layout]
             type = "layout"
@@ -305,14 +305,22 @@ public sealed class TomlSettingsProviderTests
             type = "cpu"
             monitor = "primary"
             format = "CPU {percent}%"
+
+            [module.battery]
+            format = "{battery_symbol} {charging}"
+            symbols = { charging = "CHG", batteryEmpty = "E", batteryQuarter = "Q", batteryHalf = "H", batteryThreeQuarters = "TQ", batteryFull = "F" }
             """);
 
         var options = new TomlSettingsProvider(path).Load().ToWorkspaceBarOptions();
 
         Assert.Equal("layout", options.ModulesLeft!.Single().Type);
-        Assert.Equal("cpu", options.ModulesRight!.Single().Type);
-        Assert.Equal(WorkspaceBarModuleMonitor.Primary, options.ModulesRight!.Single().Monitor);
-        Assert.Equal("CPU {percent}%", options.ModulesRight!.Single().Format);
+        Assert.Equal("cpu", options.ModulesRight!.First().Type);
+        Assert.Equal(WorkspaceBarModuleMonitor.Primary, options.ModulesRight!.First().Monitor);
+        Assert.Equal("CPU {percent}%", options.ModulesRight!.First().Format);
+        var battery = options.ModulesRight!.Single(module => module.Type == "battery");
+        Assert.Equal("{battery_symbol} {charging}", battery.Format);
+        Assert.Equal("CHG", battery.BatterySymbols!["charging"]);
+        Assert.Equal("F", battery.BatterySymbols["batteryFull"]);
         Assert.Equal(Color.FromArgb(0, 0, 0, 0).ToArgb(), options.ModulesLeft!.Single().Style.Background.ToArgb());
         Assert.Equal(0, options.ModulesLeft!.Single().Style.Padding.All);
     }

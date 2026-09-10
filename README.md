@@ -172,7 +172,7 @@ Module tables are top-level `[module.<id>]` tables. Supported module types are `
 
 `monitor` defaults to `all`; `primary` shows only on the primary monitor and `focused` only on the focused monitor. Only `color` and `font` inherit from `[statusbar]`. Module `background`, `padding`, `margin`, `radius`, and `border` default independently to transparent, zero, zero, zero, and no border.
 
-`format` is supported by data modules and `command`. 
+`format` is supported by data modules and `command`. For the `battery` module, `symbols` configures state glyphs and `charging` configures the charging glyph; the default charging glyph is `⚡`.
 
 #### Built-in Module Values and Formats
 
@@ -186,7 +186,7 @@ Module tables are top-level `[module.<id>]` tables. Supported module types are `
 | `clock` | Yes | `{:%H:%M:%S}` | `{:%...}` date/time syntax. |
 | `date` | Yes | `{:%Y-%m-%d}` | `{:%...}` date/time syntax. |
 | `uptime` | Yes | `{days}d {hours}:{minutes}` | `{days}`, `{hours}`, `{minutes}`, `{seconds}`, `{total_seconds}` |
-| `battery` | Yes | `{percent}%{charging}` | `{percent}`, `{charging}`, `{ac_status}`. Empty when no battery exists. |
+| `battery` | Yes | `{percent}%{charging}` | `{percent}`, `{battery_symbol}`, `{charging}`, `{ac_status}`. `battery_symbol` selects `batteryEmpty`, `batteryQuarter`, `batteryHalf`, `batteryThreeQuarters`, or `batteryFull`. Empty when no battery exists. |
 | `disk` | Yes | `{output}` | `{root}`, `{used_percent}`, `{used_bytes}`, `{free_bytes}`, `{total_bytes}`, `{output}` |
 | `network` | Yes | `{output}` | `{download_bps}`, `{upload_bps}`, `{download_rate}`, `{upload_rate}`, `{output}` |
 | `text` | No `format` | Literal `text` value | Configured `text`, rendered unchanged. |

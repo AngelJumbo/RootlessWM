@@ -112,6 +112,7 @@ public sealed record WorkspaceBarWidgetOptions(
     WorkspaceBarStyleOptions? Style = null)
 {
     public string Id { get; init; } = Kind;
+    public IReadOnlyDictionary<string, string>? BatterySymbols { get; init; }
 }
 
 public enum WorkspaceBarModuleMonitor
@@ -134,7 +135,8 @@ public sealed record WorkspaceBarModuleOptions(
     IReadOnlyDictionary<MasterStackLayoutMode, string>? Symbols = null,
     string? Symbol = null,
     Color? ActiveBackground = null,
-    Color? ActiveForeground = null)
+    Color? ActiveForeground = null,
+    IReadOnlyDictionary<string, string>? BatterySymbols = null)
 {
     public bool IsShownOn(bool isPrimary, bool isFocused)
         => Monitor == WorkspaceBarModuleMonitor.All
