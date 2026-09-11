@@ -71,6 +71,8 @@ margin = { left = 4 }
 [module.memory]
 type = "memory"
 monitor = "primary"
+# Module format supports inline styling tags: [c=color s=size w=weight f=family]...[/]
+# format = "[c=#89b4fa s=14 w=bold]MEM[/] {used_percent}%"
 format = "MEM {used_percent}%"
 color = "#fab387"
 

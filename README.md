@@ -194,6 +194,32 @@ Module tables are top-level `[module.<id>]` tables. Supported module types are `
 
 Date and clock formats use `{:%...}` with the supported date/time tokens. Numeric values use invariant formatting. Unknown placeholders remain unchanged.
 
+#### Inline Styling
+
+Module `format` strings (as well as static module text) support rich inline formatting tags:
+
+- **Syntax**: `[c=<color> s=<size> w=<weight> f=<family>]text[/]`
+- **Close Tag**: `[/]` restores the previous style.
+- **Escape**: `[[` outputs a literal `[`, and `]]` outputs a literal `]`.
+
+| Attribute | Meaning | Examples |
+| :--- | :--- | :--- |
+| `c` | Color | `#89b4fa`, `#fab387cc`, `red` |
+| `s` | Size (pt) | `11`, `14` |
+| `w` | Weight | `normal`, `bold`, `semibold`, `light`, `100`..`900` |
+| `f` | Font family | `"Cascadia Mono"`, `"Segoe UI"` |
+
+Example:
+```toml
+[module.memory]
+type = "memory"
+format = "[c=#89b4fa s=14 w=bold]MEM[/] {used_percent}%"
+
+[module.cpu]
+type = "cpu"
+format = "[c=#f38ba8 f=\"Cascadia Code\" w=bold]CPU[/] [c=#a6e3a1 s=11]{percent}%[/]"
+```
+
 This is a breaking configuration change. Existing `[[statusbar.sections]]` and `[[statusbar.widgets]]` settings are deprecated; migrate them using `settings.example.toml`.
 
 #### Application Runner (`[runner]`)

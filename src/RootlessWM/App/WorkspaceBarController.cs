@@ -588,37 +588,166 @@ internal sealed class WorkspaceBarController : IDisposable
                 return;
             }
 
-            using var paint = CreateTextPaint(color, style, align);
-            var displayText = ellipsis ? Ellipsize(text, rect.Width, paint) : text;
-            var metrics = paint.FontMetrics;
-            var y = rect.MidY - ((metrics.Ascent + metrics.Descent) / 2F);
-            var x = align switch
+            var styled = InlineStyleParser.Parse(text);
+            DrawStyledText(canvas, styled, rect, color, style, align, ellipsis);
+        }
+
+        private static void DrawStyledText(SKCanvas canvas, StyledText styled, SKRect rect, Color defaultColor, WorkspaceBarStyleOptions style, SKTextAlign align, bool ellipsis = false)
+        {
+            if (styled.IsEmpty || rect.Width <= 0 || rect.Height <= 0)
             {
-                SKTextAlign.Center => rect.MidX,
-                SKTextAlign.Right => rect.Right,
+                return;
+            }
+
+            var targetStyled = ellipsis ? Ellipsize(styled, rect.Width, style, defaultColor) : styled;
+            var totalWidth = MeasureStyledText(targetStyled, defaultColor, style);
+
+            var startX = align switch
+            {
+                SKTextAlign.Center => rect.MidX - (totalWidth / 2F),
+                SKTextAlign.Right => rect.Right - totalWidth,
                 _ => rect.Left
             };
-            canvas.DrawText(displayText, x, y, paint);
+
+            var currentX = startX;
+            foreach (var span in targetStyled.Spans)
+            {
+                if (string.IsNullOrEmpty(span.Text))
+                {
+                    continue;
+                }
+
+                using var paint = CreateSpanPaint(span, defaultColor, style, SKTextAlign.Left);
+                var spanWidth = paint.MeasureText(span.Text);
+                var metrics = paint.FontMetrics;
+                var y = rect.MidY - ((metrics.Ascent + metrics.Descent) / 2F);
+
+                canvas.DrawText(span.Text, currentX, y, paint);
+                currentX += spanWidth;
+            }
         }
 
         private static float MeasureText(string text, WorkspaceBarStyleOptions style)
         {
-            using var paint = CreateTextPaint(Color.White, style, SKTextAlign.Left);
-            return paint.MeasureText(text ?? string.Empty);
+            if (string.IsNullOrEmpty(text))
+            {
+                return 0;
+            }
+
+            var styled = InlineStyleParser.Parse(text);
+            return MeasureStyledText(styled, style.Foreground, style);
         }
 
-        private static SKPaint CreateTextPaint(Color color, WorkspaceBarStyleOptions style, SKTextAlign align)
+        private static float MeasureStyledText(StyledText styled, Color defaultColor, WorkspaceBarStyleOptions style)
         {
-            var weight = style.FontStyle.HasFlag(FontStyle.Bold) ? SKFontStyleWeight.Bold : SKFontStyleWeight.Normal;
-            var slant = style.FontStyle.HasFlag(FontStyle.Italic) ? SKFontStyleSlant.Italic : SKFontStyleSlant.Upright;
+            if (styled.IsEmpty)
+            {
+                return 0;
+            }
+
+            var totalWidth = 0F;
+            foreach (var span in styled.Spans)
+            {
+                if (string.IsNullOrEmpty(span.Text))
+                {
+                    continue;
+                }
+
+                using var paint = CreateSpanPaint(span, defaultColor, style, SKTextAlign.Left);
+                totalWidth += paint.MeasureText(span.Text);
+            }
+
+            return totalWidth;
+        }
+
+        private static SKPaint CreateSpanPaint(StyledSpan span, Color defaultColor, WorkspaceBarStyleOptions style, SKTextAlign align = SKTextAlign.Left)
+        {
+            var color = span.Foreground ?? defaultColor;
+            var fontSize = span.FontSize ?? style.FontSize;
+            var fontFamily = span.FontFamily ?? style.FontFamily;
+            var weight = span.FontWeight ?? (style.FontStyle.HasFlag(FontStyle.Bold) ? SKFontStyleWeight.Bold : SKFontStyleWeight.Normal);
+            var slant = span.FontSlant ?? (style.FontStyle.HasFlag(FontStyle.Italic) ? SKFontStyleSlant.Italic : SKFontStyleSlant.Upright);
+
             return new SKPaint
             {
                 IsAntialias = true,
                 Color = ToSkColor(color),
-                TextSize = style.FontSize * 96F / 72F,
-                Typeface = SKTypeface.FromFamilyName(style.FontFamily, weight, SKFontStyleWidth.Normal, slant),
+                TextSize = fontSize * 96F / 72F,
+                Typeface = SKTypeface.FromFamilyName(fontFamily, weight, SKFontStyleWidth.Normal, slant),
                 TextAlign = align
             };
+        }
+
+        private static StyledText Ellipsize(StyledText styled, float maxWidth, WorkspaceBarStyleOptions style, Color defaultColor)
+        {
+            const string suffix = "...";
+            if (MeasureStyledText(styled, defaultColor, style) <= maxWidth)
+            {
+                return styled;
+            }
+
+            if (styled.Spans.Count == 1)
+            {
+                var singleSpan = styled.Spans[0];
+                using var paint = CreateSpanPaint(singleSpan, defaultColor, style, SKTextAlign.Left);
+                return new StyledText([singleSpan with { Text = Ellipsize(singleSpan.Text, maxWidth, paint) }]);
+            }
+
+            var resultSpans = new List<StyledSpan>();
+            var currentWidth = 0F;
+
+            for (var i = 0; i < styled.Spans.Count; i++)
+            {
+                var span = styled.Spans[i];
+                if (string.IsNullOrEmpty(span.Text))
+                {
+                    continue;
+                }
+
+                using var paint = CreateSpanPaint(span, defaultColor, style, SKTextAlign.Left);
+                var spanWidth = paint.MeasureText(span.Text);
+
+                if (currentWidth + spanWidth <= maxWidth)
+                {
+                    resultSpans.Add(span);
+                    currentWidth += spanWidth;
+                }
+                else
+                {
+                    var text = span.Text;
+                    var added = false;
+                    for (var length = text.Length - 1; length > 0; length--)
+                    {
+                        var candidate = text[..length] + suffix;
+                        if (currentWidth + paint.MeasureText(candidate) <= maxWidth)
+                        {
+                            resultSpans.Add(span with { Text = candidate });
+                            added = true;
+                            break;
+                        }
+                    }
+
+                    if (!added)
+                    {
+                        if (resultSpans.Count == 0)
+                        {
+                            resultSpans.Add(span with { Text = suffix });
+                        }
+                        else
+                        {
+                            var lastIndex = resultSpans.Count - 1;
+                            var lastSpan = resultSpans[lastIndex];
+                            using var lastPaint = CreateSpanPaint(lastSpan, defaultColor, style, SKTextAlign.Left);
+                            var available = maxWidth - (currentWidth - lastPaint.MeasureText(lastSpan.Text));
+                            resultSpans[lastIndex] = lastSpan with { Text = Ellipsize(lastSpan.Text, available, lastPaint) };
+                        }
+                    }
+
+                    break;
+                }
+            }
+
+            return resultSpans.Count == 0 ? StyledText.Empty : new StyledText(resultSpans);
         }
 
         private static string Ellipsize(string text, float maxWidth, SKPaint paint)
