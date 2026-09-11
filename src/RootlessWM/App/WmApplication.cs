@@ -471,6 +471,24 @@ internal sealed class WmApplication
             return;
         }
 
+        if (command == TilingCommand.ToggleStatusBar)
+        {
+            // Works regardless of management state; hides/shows the bar only for the focused
+            // monitor's current workspace, so other monitors/workspaces are unaffected.
+            var monitorHandle = GetFocusedMonitorHandle();
+            if (monitorHandle != nint.Zero)
+            {
+                var workspace = _workspaceState.GetCurrentWorkspace(monitorHandle);
+                _workspaceBar?.ToggleStatusBar(monitorHandle, workspace);
+                _log.Info("status_bar_toggled", new { monitor = $"0x{monitorHandle.ToInt64():X}", workspace });
+                if (_managementState.IsEnabled)
+                {
+                    RetilePrimaryWindows();
+                }
+            }
+            return;
+        }
+
         if (!_managementState.IsEnabled)
         {
             _log.Info("tiling_command_ignored", new { command = command.ToString(), reason = "management_disabled" });
@@ -991,7 +1009,9 @@ internal sealed class WmApplication
                     workspace,
                     monitor.Handle,
                     _layoutOptions);
-                var workArea = workspaceBarOptions.ReserveTopSpace(monitor.Bounds);
+                var workArea = _workspaceBar?.IsHiddenForWorkspace(monitor.Handle, workspace) == true
+                    ? monitor.Bounds
+                    : workspaceBarOptions.ReserveTopSpace(monitor.Bounds);
                 if (!workArea.IsUsable)
                 {
                     continue;

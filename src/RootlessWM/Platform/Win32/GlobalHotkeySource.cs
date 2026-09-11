@@ -36,6 +36,7 @@ internal sealed class GlobalHotkeySource : IDisposable
         (45, NativeMethods.ModAlt | NativeMethods.ModShift, NativeMethods.VkF, TilingCommand.MaximizeWindow),
         (46, NativeMethods.ModAlt, NativeMethods.VkE, TilingCommand.ToggleExplorer),
         (47, NativeMethods.ModAlt, NativeMethods.VkP, TilingCommand.OpenRunner),
+        (48, NativeMethods.ModAlt, NativeMethods.VkB, TilingCommand.ToggleStatusBar),
         (21, NativeMethods.ModAlt, NativeMethods.Vk1, TilingCommand.SelectWorkspace1),
         (22, NativeMethods.ModAlt, NativeMethods.Vk2, TilingCommand.SelectWorkspace2),
         (23, NativeMethods.ModAlt, NativeMethods.Vk3, TilingCommand.SelectWorkspace3),

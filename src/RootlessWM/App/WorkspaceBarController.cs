@@ -17,6 +17,7 @@ internal sealed class WorkspaceBarController : IDisposable
     private readonly WorkspaceBarWidgetRegistry _widgetRegistry = WorkspaceBarWidgetRegistry.CreateDefault();
     private readonly System.Windows.Forms.Timer _widgetsTimer;
     private readonly HashSet<nint> _fullscreenMonitors = [];
+    private readonly Dictionary<nint, HashSet<int>> _hiddenWorkspaces = [];
     private WorkspaceBarOptions _options = WorkspaceBarOptionsDefaults.Create();
     private bool _configuredVisible;
     private bool _globallyVisible = true;
@@ -64,19 +65,42 @@ internal sealed class WorkspaceBarController : IDisposable
         ApplyVisibility();
     }
 
+    // Toggles the bar for the given monitor's currently active workspace only, so the
+    // hidden/shown state persists per monitor+workspace pair across workspace switches.
+    public void ToggleStatusBar(nint monitorHandle, int workspaceIndex)
+    {
+        if (!_hiddenWorkspaces.TryGetValue(monitorHandle, out var hidden))
+        {
+            hidden = [];
+            _hiddenWorkspaces[monitorHandle] = hidden;
+        }
+
+        if (!hidden.Remove(workspaceIndex))
+        {
+            hidden.Add(workspaceIndex);
+        }
+
+        ApplyVisibility();
+    }
+
+    // Lets tiling know whether it should reserve space for this monitor+workspace's bar.
+    public bool IsHiddenForWorkspace(nint monitorHandle, int workspaceIndex)
+        => _hiddenWorkspaces.TryGetValue(monitorHandle, out var hidden) && hidden.Contains(workspaceIndex);
+
     private void ApplyVisibility()
     {
         foreach (var (handle, bar) in _bars)
         {
-            bar.ApplyOptions(GetOptionsFor(handle));
+            bar.ApplyOptions(GetOptionsFor(handle, bar.CurrentWorkspace));
         }
     }
 
-    private WorkspaceBarOptions GetOptionsFor(nint monitorHandle)
+    private WorkspaceBarOptions GetOptionsFor(nint monitorHandle, int workspaceIndex)
     {
+        var hiddenByToggle = _hiddenWorkspaces.TryGetValue(monitorHandle, out var hidden) && hidden.Contains(workspaceIndex);
         return _options with
         {
-            Visible = _configuredVisible && _globallyVisible && !_fullscreenMonitors.Contains(monitorHandle)
+            Visible = _configuredVisible && _globallyVisible && !_fullscreenMonitors.Contains(monitorHandle) && !hiddenByToggle
         };
     }
 
@@ -103,7 +127,7 @@ internal sealed class WorkspaceBarController : IDisposable
                 _bars.Add(monitor.Handle, bar);
             }
 
-            bar.ApplyOptions(GetOptionsFor(monitor.Handle));
+            bar.ApplyOptions(GetOptionsFor(monitor.Handle, getCurrentWorkspace(monitor.Handle)));
             bar.Update(
                 getCurrentWorkspace(monitor.Handle),
                 getLayoutMode(monitor.Handle),
@@ -173,6 +197,8 @@ internal sealed class WorkspaceBarController : IDisposable
         }
 
         private int WorkspaceCount { get; }
+
+        public int CurrentWorkspace => _currentWorkspace;
 
         public void ApplyOptions(WorkspaceBarOptions options)
         {

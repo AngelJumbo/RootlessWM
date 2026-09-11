@@ -77,6 +77,7 @@ internal static class NativeMethods
     internal const uint VkQ = 0x51;
     internal const uint VkR = 0x52;
     internal const uint VkE = 0x45;
+    internal const uint VkB = 0x42;
     internal const uint VkEnter = 0x0D;
     internal const uint VkEscape = 0x1B;
     internal const uint VkSpace = 0x20;

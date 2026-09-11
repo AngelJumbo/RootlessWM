@@ -48,5 +48,6 @@ public enum TilingCommand
     EnableManagement,
     DisableManagement,
     ToggleExplorer,
-    OpenRunner
+    OpenRunner,
+    ToggleStatusBar
 }
