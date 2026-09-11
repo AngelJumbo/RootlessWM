@@ -5,6 +5,8 @@ namespace RootlessWM.App;
 internal sealed class CpuWidgetProvider : IWidgetProvider
 {
     private readonly SystemMetricsSampler _metricsSampler;
+    private DateTimeOffset _lastSampleTime;
+    private double _lastPercent;
 
     public CpuWidgetProvider(SystemMetricsSampler metricsSampler)
     {
@@ -13,15 +15,31 @@ internal sealed class CpuWidgetProvider : IWidgetProvider
 
     public string Key => "cpu";
 
-    public string GetText() => $" {_metricsSampler.SampleCpuUsagePercent():0}%";
+    public string GetText() => FormatOutput(GetPercent());
 
     public IReadOnlyDictionary<string, string> GetValues()
     {
-        var percent = _metricsSampler.SampleCpuUsagePercent();
+        var percent = GetPercent();
         return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["percent"] = percent.ToString("0", System.Globalization.CultureInfo.InvariantCulture),
-            ["output"] = $" {percent:0}%"
+            ["output"] = FormatOutput(percent)
         };
     }
+
+    private double GetPercent()
+    {
+        var now = DateTimeOffset.UtcNow;
+        if ((now - _lastSampleTime).TotalMilliseconds < 750)
+        {
+            return _lastPercent;
+        }
+
+        _lastPercent = _metricsSampler.SampleCpuUsagePercent();
+        _lastSampleTime = now;
+        return _lastPercent;
+    }
+
+    private static string FormatOutput(double percent)
+        => $"{percent,3:0}%";
 }

@@ -61,6 +61,7 @@ public sealed class WidgetProviderTests
         var text = provider.GetText();
 
         Assert.EndsWith("%", text);
+        Assert.Equal(4, text.Length);
     }
 
     [Fact]
