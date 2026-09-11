@@ -24,6 +24,9 @@ hide-explorer-on-start = false
 # RootlessWM cannot reposition them, so excluding them here avoids the wasted retile attempts.
 excluded-executables = ["Taskmgr"]
 
+# Keep native window title bars and resize borders. Set false for borderless tiled windows.
+decorations = true
+
 [statusbar]
 visible = true
 height = 28

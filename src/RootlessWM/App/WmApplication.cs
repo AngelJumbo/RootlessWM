@@ -58,7 +58,11 @@ internal sealed class WmApplication
         _windowTracker = new WindowTracker(_eligibilityClassifier);
         _windowTiler = new WindowTiler(
             new MasterStackLayout(),
-            new GuardedWindowPlacementApplier(_windowInspector, _eligibilityClassifier));
+            new GuardedWindowPlacementApplier(
+                _windowInspector,
+                _eligibilityClassifier,
+                new WindowDecorationController(),
+                () => _settings.Decorations));
         _commandProcessor = new TilingCommandProcessor(_tilingState, _windowCommander);
         _monitorCommandProcessor = new MonitorCommandProcessor(
             _tilingState,

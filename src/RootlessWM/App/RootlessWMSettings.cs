@@ -15,7 +15,8 @@ public sealed record RootlessWMSettings(
     ToggleExplorerBehaviour ToggleExplorerBehaviour = ToggleExplorerBehaviour.TaskbarOnly,
     RunnerSettings? Runner = null,
     bool HideExplorerOnStart = false,
-    IReadOnlyList<string>? ExcludedExecutables = null)
+    IReadOnlyList<string>? ExcludedExecutables = null,
+    bool Decorations = true)
 {
     public static RootlessWMSettings Default { get; } = new(0.55, 0, 0);
 

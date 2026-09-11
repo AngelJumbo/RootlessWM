@@ -8,6 +8,7 @@ RootlessWM is a native Windows tiling window manager inspired by DWM, focused on
 - Automatic tiling of eligible top-level Windows applications.
 - Master-and-stack window management.
 - Automatic handling of newly opened and closed windows.
+- Optional borderless tiled windows by disabling native window decorations.
 - Fullscreen mode for the active window.
 - Mouse movement over a managed window can automatically focus it.
 ### Layouts

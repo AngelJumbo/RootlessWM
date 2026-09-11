@@ -6,7 +6,9 @@ namespace RootlessWM.Platform.Win32;
 
 internal sealed class GuardedWindowPlacementApplier(
     WindowInspector windowInspector,
-    WindowEligibilityClassifier eligibilityClassifier) : IWindowPlacementApplier
+    WindowEligibilityClassifier eligibilityClassifier,
+    WindowDecorationController? decorationController = null,
+    Func<bool>? decorationsEnabled = null) : IWindowPlacementApplier
 {
     public PlacementResult Apply(WindowPlacement placement)
     {
@@ -24,6 +26,12 @@ internal sealed class GuardedWindowPlacementApplier(
         if (eligibility != WindowEligibility.Managed)
         {
             return PlacementResult.Skipped(placement.Handle, $"ineligible_{eligibility}");
+        }
+
+        if (decorationsEnabled is not null && !decorationsEnabled() && decorationController is not null
+            && !decorationController.Disable(placement.Handle))
+        {
+            return PlacementResult.Skipped(placement.Handle, "disable_decorations_failed");
         }
 
         if (NativeMethods.IsZoomed(placement.Handle))

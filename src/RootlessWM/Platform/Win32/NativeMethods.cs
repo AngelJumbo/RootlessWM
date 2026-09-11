@@ -7,6 +7,8 @@ internal static class NativeMethods
 {
     internal const int GwlStyle = -16;
     internal const int GwlExStyle = -20;
+    internal const uint WsCaption = 0x00C00000;
+    internal const uint WsThickFrame = 0x00040000;
     internal const uint WsChild = 0x40000000;
     internal const uint WsExToolWindow = 0x00000080;
     internal const int WsExLayered = 0x00080000;
@@ -46,6 +48,7 @@ internal static class NativeMethods
     internal const uint SwpNoActivate = 0x0010;
     internal const uint SwpShowWindow = 0x0040;
     internal const uint SwpHideWindow = 0x0080;
+    internal const uint SwpFrameChanged = 0x0020;
     internal const uint WineventOutOfContext = 0;
     internal const uint WineventSkipOwnProcess = 2;
     internal const uint ModAlt = 0x0001;
@@ -225,6 +228,9 @@ internal static class NativeMethods
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
     internal static extern nint GetWindowLongPtr(nint windowHandle, int index);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
+    internal static extern nint SetWindowLongPtr(nint windowHandle, int index, nint value);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     internal static extern int GetClassName(nint windowHandle, StringBuilder className, int maximumCount);

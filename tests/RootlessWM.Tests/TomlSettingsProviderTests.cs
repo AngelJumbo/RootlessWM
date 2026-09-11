@@ -142,6 +142,17 @@ public sealed class TomlSettingsProviderTests
     }
 
     [Fact]
+    public void Load_Decorations_MapsConfiguredValue()
+    {
+        var path = Path.Combine(CreateTempDir(), "settings.toml");
+        File.WriteAllText(path, "decorations = false");
+
+        var settings = new TomlSettingsProvider(path).Load();
+
+        Assert.False(settings.Decorations);
+    }
+
+    [Fact]
     public void Load_RunnerConfig_MapsConfiguredValuesAndHotkey()
     {
         var path = Path.Combine(CreateTempDir(), "settings.toml");
