@@ -112,7 +112,7 @@ public sealed record RootlessWMSettings(
             "memory" => "{used_percent}%",
             "clock" => "{:%H:%M:%S}",
             "date" => "{:%Y-%m-%d}",
-                "uptime" => "{days}d {hours}:{minutes}",
+            "uptime" => "{days}d {hours}:{minutes}",
             "battery" => "{output}",
             "disk" => "{output}",
             "network" => "{output}",
@@ -236,7 +236,8 @@ public sealed record RootlessWMSettings(
                 FontFamily = barStyle.FontFamily,
                 FontSize = barStyle.FontSize,
                 FontStyle = barStyle.FontStyle
-            }) with { Foreground = barStyle.Foreground };
+            }) with
+        { Foreground = barStyle.Foreground };
     }
 
     private static WorkspaceBarStyleOptions ParseStyle(WorkspaceBarStyleSettings? style, WorkspaceBarStyleOptions fallback)
