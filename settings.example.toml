@@ -200,11 +200,16 @@ ToggleStatusBar = "Alt+B"
 
 # Launch custom programs directly with hotkeys.
 # Define one or more [[launch]] blocks with hotkey and command (executable name or full path),
-# plus optional args and working-directory.
+# plus optional args, working-directory, and admin elevation.
 # [[launch]]
 # hotkey = "Alt+T"
 # command = "pwsh.exe"
 # args = "-NoLogo"
+
+# [[launch]]
+# hotkey = "Alt+Shift+T"
+# command = "pwsh.exe"
+# admin = true
 
 # [[launch]]
 # hotkey = "Alt+Return"

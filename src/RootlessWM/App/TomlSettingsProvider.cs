@@ -483,7 +483,8 @@ internal sealed class TomlSettingsProvider
 
                 var args = GetString(item, "Args", "Arguments");
                 var workingDir = GetString(item, "WorkingDirectory", "WorkingDir", "WorkDir");
-                results.Add(new LaunchHotkeySettings(hotkey, command, args, workingDir));
+                var runAsAdmin = GetBool(item, "Admin") ?? GetBool(item, "Elevated") ?? GetBool(item, "RunAsAdmin") ?? false;
+                results.Add(new LaunchHotkeySettings(hotkey, command, args, workingDir, runAsAdmin));
             }
 
             return results.Count > 0 ? results : null;

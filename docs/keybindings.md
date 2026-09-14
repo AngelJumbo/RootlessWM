@@ -41,6 +41,11 @@ command = "pwsh.exe"
 args = "-NoLogo"
 
 [[launch]]
+hotkey = "Alt+Shift+T"
+command = "pwsh.exe"
+admin = true
+
+[[launch]]
 hotkey = "Alt+Return"
 command = "wt.exe"
 ```
@@ -51,6 +56,7 @@ command = "wt.exe"
 | `command` | String | Executable name or file path to run. |
 | `args` | String (optional) | Command-line arguments. |
 | `working-directory` | String (optional) | Initial working directory. |
+| `admin` | Boolean (optional) | Launch with elevated administrator privileges (UAC prompt). |
 
 ## See Also
 

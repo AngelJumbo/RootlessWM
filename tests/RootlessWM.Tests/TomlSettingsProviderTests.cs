@@ -199,6 +199,7 @@ public sealed class TomlSettingsProviderTests
             command = "pwsh.exe"
             args = "-NoLogo"
             working-directory = "C:\\Tools"
+            admin = true
 
             [[launch]]
             hotkey = "Alt+Return"
@@ -213,9 +214,11 @@ public sealed class TomlSettingsProviderTests
         Assert.Equal("pwsh.exe", settings.Launch[0].Command);
         Assert.Equal("-NoLogo", settings.Launch[0].Args);
         Assert.Equal("C:\\Tools", settings.Launch[0].WorkingDirectory);
+        Assert.True(settings.Launch[0].RunAsAdmin);
         Assert.Equal("Alt+Return", settings.Launch[1].Hotkey);
         Assert.Equal("wt.exe", settings.Launch[1].Command);
         Assert.Null(settings.Launch[1].Args);
+        Assert.False(settings.Launch[1].RunAsAdmin);
     }
 
     [Fact]
