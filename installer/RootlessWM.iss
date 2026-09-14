@@ -127,6 +127,7 @@ begin
     '/TN "' + ScheduledTaskName + '" ' +
     '/TR ""' + ExePath + '" --manage --no-logs" ' +
     '/SC ONLOGON ' +
+    '/DELAY 0000:10 ' +
     '/RU "' + UserName + '" ' +
     '/IT ' +
     '/RL HIGHEST ' +
