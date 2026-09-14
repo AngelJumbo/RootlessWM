@@ -151,7 +151,7 @@ begin
   begin
     RaiseException(
       'Unable to create the elevated RootlessWM startup task.' +
-      #13#10#13#10 +
+      Chr(13) + Chr(10) + Chr(13) + Chr(10) +
       'schtasks exit code: ' + IntToStr(ResultCode)
     );
   end;
