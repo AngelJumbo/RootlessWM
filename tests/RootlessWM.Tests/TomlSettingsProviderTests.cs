@@ -142,6 +142,17 @@ public sealed class TomlSettingsProviderTests
     }
 
     [Fact]
+    public void Load_FocusFollowsMouse_MapsConfiguredValue()
+    {
+        var path = Path.Combine(CreateTempDir(), "settings.toml");
+        File.WriteAllText(path, "focus-follows-mouse = false");
+
+        var settings = new TomlSettingsProvider(path).Load();
+
+        Assert.False(settings.FocusFollowsMouse);
+    }
+
+    [Fact]
     public void Load_RunnerConfig_MapsConfiguredValuesAndHotkey()
     {
         var path = Path.Combine(CreateTempDir(), "settings.toml");

@@ -8,6 +8,10 @@ inner-gap = 8
 layout = "MasterLeft"
 master-count = 1
 
+# Focus a managed window when the pointer moves over it.
+# Owned popups and context menus keep focus until dismissed.
+focus-follows-mouse = true
+
 # Controls what Alt+E / ToggleExplorer hides while Explorer keeps running.
 # Options:
 # - TaskbarOnly: hide taskbars only; wallpaper and desktop icons remain visible.

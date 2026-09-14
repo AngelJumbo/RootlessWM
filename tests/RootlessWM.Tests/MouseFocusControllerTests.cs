@@ -9,7 +9,7 @@ public sealed class MouseFocusControllerTests
     public void TryFocus_EligibleNonForegroundWindow_FocusesWindow()
     {
         var commander = new RecordingWindowCommander();
-        var controller = new MouseFocusController(commander, handle => handle == (nint)2, () => (nint)1);
+        var controller = new MouseFocusController(commander, handle => handle == (nint)2, () => (nint)1, (_, _) => false);
 
         var focused = controller.TryFocus((nint)2);
 
@@ -21,10 +21,24 @@ public sealed class MouseFocusControllerTests
     public void TryFocus_ForegroundOrIneligibleWindow_DoesNotFocusWindow()
     {
         var commander = new RecordingWindowCommander();
-        var controller = new MouseFocusController(commander, handle => handle == (nint)2, () => (nint)2);
+        var controller = new MouseFocusController(commander, handle => handle == (nint)2, () => (nint)2, (_, _) => false);
 
         Assert.False(controller.TryFocus((nint)2));
         Assert.False(controller.TryFocus((nint)3));
+        Assert.Null(commander.FocusedHandle);
+    }
+
+    [Fact]
+    public void TryFocus_ForegroundWindowOwnedByTarget_DoesNotDismissPopup()
+    {
+        var commander = new RecordingWindowCommander();
+        var controller = new MouseFocusController(
+            commander,
+            _ => true,
+            () => (nint)3,
+            (window, owner) => window == (nint)3 && owner == (nint)2);
+
+        Assert.False(controller.TryFocus((nint)2));
         Assert.Null(commander.FocusedHandle);
     }
 

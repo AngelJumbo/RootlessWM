@@ -72,7 +72,8 @@ internal sealed class WmApplication
         _mouseFocusController = new MouseFocusController(
             _windowCommander,
             CanFocusWithMouse,
-            NativeMethods.GetForegroundWindow);
+            NativeMethods.GetForegroundWindow,
+            IsOwnedBy);
     }
 
     public int Run(string[] args)
@@ -838,13 +839,29 @@ internal sealed class WmApplication
 
     private bool CanFocusWithMouse(nint windowHandle)
     {
-        if (!_managementState.IsEnabled || !_windowTracker.Contains(windowHandle))
+        if (!_settings.FocusFollowsMouse
+            || !_managementState.IsEnabled
+            || !_windowTracker.Contains(windowHandle))
         {
             return false;
         }
 
         return _monitorOwnership.TryGetMonitor(windowHandle, out var monitorHandle)
             && _workspaceState.IsInCurrentWorkspace(windowHandle, monitorHandle);
+    }
+
+    private static bool IsOwnedBy(nint windowHandle, nint ownerHandle)
+    {
+        while (windowHandle != nint.Zero)
+        {
+            windowHandle = NativeMethods.GetWindow(windowHandle, NativeMethods.GwOwner);
+            if (windowHandle == ownerHandle)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void DisableManagement()

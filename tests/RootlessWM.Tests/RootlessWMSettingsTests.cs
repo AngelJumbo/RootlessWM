@@ -134,6 +134,12 @@ public sealed class RootlessWMSettingsTests
     }
 
     [Fact]
+    public void Default_FocusFollowsMouse_IsTrue()
+    {
+        Assert.True(RootlessWMSettings.Default.FocusFollowsMouse);
+    }
+
+    [Fact]
     public void Constructor_HideExplorerOnStart_PreservesConfiguredValue()
     {
         var settings = new RootlessWMSettings(0.55, 0, 0, HideExplorerOnStart: true);
