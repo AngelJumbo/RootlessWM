@@ -56,7 +56,8 @@ internal sealed class TomlSettingsProvider
             MapRunner(GetTable(table, "Runner")),
             GetBool(table, "HideExplorerOnStart") ?? false,
             GetStringList(table, "ExcludedExecutables"),
-            GetBool(table, "FocusFollowsMouse") ?? true);
+            GetBool(table, "FocusFollowsMouse") ?? true,
+            MapLaunchHotkeys(table));
     }
 
     private static ToggleExplorerBehaviour MapToggleExplorerBehaviour(string value)
@@ -459,5 +460,49 @@ internal sealed class TomlSettingsProvider
         }
 
         return result;
+    }
+
+    private static IReadOnlyList<LaunchHotkeySettings>? MapLaunchHotkeys(TomlTable table)
+    {
+        if (!TryGetValue(table, ["Launch", "LaunchHotkeys", "Commands"], out var value))
+        {
+            return null;
+        }
+
+        if (value is TomlTableArray array)
+        {
+            var results = new List<LaunchHotkeySettings>();
+            foreach (var item in array.OfType<TomlTable>())
+            {
+                var hotkey = GetString(item, "Hotkey", "Key");
+                var command = GetString(item, "Command", "Target", "Path", "Executable", "File");
+                if (string.IsNullOrWhiteSpace(hotkey) || string.IsNullOrWhiteSpace(command))
+                {
+                    continue;
+                }
+
+                var args = GetString(item, "Args", "Arguments");
+                var workingDir = GetString(item, "WorkingDirectory", "WorkingDir", "WorkDir");
+                results.Add(new LaunchHotkeySettings(hotkey, command, args, workingDir));
+            }
+
+            return results.Count > 0 ? results : null;
+        }
+
+        if (value is TomlTable tomlTable)
+        {
+            var results = new List<LaunchHotkeySettings>();
+            foreach (var (k, v) in tomlTable)
+            {
+                if (v is string cmdStr && !string.IsNullOrWhiteSpace(cmdStr) && !string.IsNullOrWhiteSpace(k))
+                {
+                    results.Add(new LaunchHotkeySettings(k, cmdStr));
+                }
+            }
+
+            return results.Count > 0 ? results : null;
+        }
+
+        return null;
     }
 }

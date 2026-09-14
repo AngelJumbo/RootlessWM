@@ -197,3 +197,15 @@ SwapWithPrevious = "Alt+Shift+K"
 Close = "Alt+Q"
 ToggleExplorer = "Alt+E"
 ToggleStatusBar = "Alt+B"
+
+# Launch custom programs directly with hotkeys.
+# Define one or more [[launch]] blocks with hotkey and command (executable name or full path),
+# plus optional args and working-directory.
+# [[launch]]
+# hotkey = "Alt+T"
+# command = "pwsh.exe"
+# args = "-NoLogo"
+
+# [[launch]]
+# hotkey = "Alt+Return"
+# command = "wt.exe"

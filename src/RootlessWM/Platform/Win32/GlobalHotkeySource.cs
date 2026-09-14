@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using RootlessWM.App;
 using RootlessWM.Domain;
 
@@ -58,9 +59,12 @@ internal sealed class GlobalHotkeySource : IDisposable
     ];
 
     private readonly HashSet<int> _registeredIdentifiers = [];
+    private readonly Dictionary<int, LaunchHotkeySettings> _launchBindings = [];
     private bool _disposed;
 
-    public IReadOnlyList<TilingCommand> Start(IReadOnlyDictionary<string, string>? overrides)
+    public IReadOnlyList<TilingCommand> Start(
+        IReadOnlyDictionary<string, string>? overrides,
+        IReadOnlyList<LaunchHotkeySettings>? launchHotkeys = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         var unavailableCommands = new List<TilingCommand>();
@@ -74,6 +78,27 @@ internal sealed class GlobalHotkeySource : IDisposable
             }
 
             _registeredIdentifiers.Add(binding.Identifier);
+        }
+
+        if (launchHotkeys is not null)
+        {
+            var nextIdentifier = 1000;
+            foreach (var launch in launchHotkeys)
+            {
+                if (!TryParseBinding(launch.Hotkey, out var modifiers, out var virtualKey))
+                {
+                    continue;
+                }
+
+                var identifier = nextIdentifier++;
+                if (!NativeMethods.RegisterHotKey(nint.Zero, identifier, modifiers, virtualKey))
+                {
+                    continue;
+                }
+
+                _registeredIdentifiers.Add(identifier);
+                _launchBindings[identifier] = launch;
+            }
         }
 
         return unavailableCommands;
@@ -168,6 +193,17 @@ internal sealed class GlobalHotkeySource : IDisposable
         return false;
     }
 
+    public bool TryGetLaunch(uint messageId, nuint hotkeyIdentifier, [NotNullWhen(true)] out LaunchHotkeySettings? launch)
+    {
+        if (messageId == NativeMethods.WmHotkey && _launchBindings.TryGetValue((int)hotkeyIdentifier, out launch))
+        {
+            return true;
+        }
+
+        launch = null;
+        return false;
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -181,6 +217,7 @@ internal sealed class GlobalHotkeySource : IDisposable
         }
 
         _registeredIdentifiers.Clear();
+        _launchBindings.Clear();
         _disposed = true;
     }
 }

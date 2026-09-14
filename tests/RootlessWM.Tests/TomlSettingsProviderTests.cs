@@ -190,6 +190,53 @@ public sealed class TomlSettingsProviderTests
     }
 
     [Fact]
+    public void Load_LaunchTableArray_MapsLaunchEntries()
+    {
+        var path = Path.Combine(CreateTempDir(), "settings.toml");
+        File.WriteAllText(path, """
+            [[launch]]
+            hotkey = "Alt+T"
+            command = "pwsh.exe"
+            args = "-NoLogo"
+            working-directory = "C:\\Tools"
+
+            [[launch]]
+            hotkey = "Alt+Return"
+            command = "wt.exe"
+            """);
+
+        var settings = new TomlSettingsProvider(path).Load();
+
+        Assert.NotNull(settings.Launch);
+        Assert.Equal(2, settings.Launch!.Count);
+        Assert.Equal("Alt+T", settings.Launch[0].Hotkey);
+        Assert.Equal("pwsh.exe", settings.Launch[0].Command);
+        Assert.Equal("-NoLogo", settings.Launch[0].Args);
+        Assert.Equal("C:\\Tools", settings.Launch[0].WorkingDirectory);
+        Assert.Equal("Alt+Return", settings.Launch[1].Hotkey);
+        Assert.Equal("wt.exe", settings.Launch[1].Command);
+        Assert.Null(settings.Launch[1].Args);
+    }
+
+    [Fact]
+    public void Load_LaunchTableDictionary_MapsLaunchEntries()
+    {
+        var path = Path.Combine(CreateTempDir(), "settings.toml");
+        File.WriteAllText(path, """
+            [launch]
+            "Alt+T" = "pwsh.exe"
+            "Alt+B" = "chrome.exe"
+            """);
+
+        var settings = new TomlSettingsProvider(path).Load();
+
+        Assert.NotNull(settings.Launch);
+        Assert.Equal(2, settings.Launch!.Count);
+        Assert.Contains(settings.Launch, l => l.Hotkey == "Alt+T" && l.Command == "pwsh.exe");
+        Assert.Contains(settings.Launch, l => l.Hotkey == "Alt+B" && l.Command == "chrome.exe");
+    }
+
+    [Fact]
     public void Load_InvalidToggleExplorerBehaviour_Throws()
     {
         var path = Path.Combine(CreateTempDir(), "settings.toml");

@@ -16,7 +16,8 @@ public sealed record RootlessWMSettings(
     RunnerSettings? Runner = null,
     bool HideExplorerOnStart = false,
     IReadOnlyList<string>? ExcludedExecutables = null,
-    bool FocusFollowsMouse = true)
+    bool FocusFollowsMouse = true,
+    IReadOnlyList<LaunchHotkeySettings>? Launch = null)
 {
     public static RootlessWMSettings Default { get; } = new(0.55, 0, 0);
 

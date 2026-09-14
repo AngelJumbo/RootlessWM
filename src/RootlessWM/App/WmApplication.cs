@@ -350,6 +350,10 @@ internal sealed class WmApplication
                     ExecuteTilingCommand(command);
                     UpdateStatus(trayController);
                 }
+                else if (hotkeySource?.TryGetLaunch(messageId, hotkeyIdentifier, out var launch) == true)
+                {
+                    ExecuteLaunch(launch);
+                }
                 else if (messageId is NativeMethods.WmDisplayChange or NativeMethods.WmSettingChange
                     && _managementState.IsEnabled
                     && !_sessionLocked)
@@ -377,7 +381,7 @@ internal sealed class WmApplication
             LoadSettings();
             hotkeySource?.Dispose();
             hotkeySource = new GlobalHotkeySource();
-            var unavailableCommands = hotkeySource.Start(_settings.Hotkeys);
+            var unavailableCommands = hotkeySource.Start(_settings.Hotkeys, _settings.Launch);
             workspaceBar.ApplyOptions(_settings.ToWorkspaceBarOptions());
             runnerController.ApplySettings(_settings.Runner);
             if (_managementState.IsEnabled)
@@ -447,6 +451,30 @@ internal sealed class WmApplication
 
             workspaceBar.SetVisible(true);
             UpdateStatus(statusController);
+        }
+    }
+
+    private void ExecuteLaunch(LaunchHotkeySettings launch)
+    {
+        _runnerController?.Dismiss();
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = launch.Command,
+                Arguments = launch.Args ?? string.Empty,
+                WorkingDirectory = launch.WorkingDirectory ?? string.Empty,
+                UseShellExecute = true
+            });
+            _log.Info("program_launched", new { hotkey = launch.Hotkey, command = launch.Command, args = launch.Args });
+        }
+        catch (System.ComponentModel.Win32Exception exception)
+        {
+            _log.Error("program_launch_failed", new { hotkey = launch.Hotkey, command = launch.Command, error = exception.NativeErrorCode });
+        }
+        catch (Exception exception)
+        {
+            _log.Error("program_launch_failed", new { hotkey = launch.Hotkey, command = launch.Command, error = exception.Message });
         }
     }
 

@@ -91,6 +91,49 @@ public sealed class RootlessWMSettingsTests
         Assert.Equal("run", settings.Runner.Input.Prompt);
     }
 
+    [Fact]
+    public void Constructor_Launch_PreservesConfiguredValues()
+    {
+        var launchEntries = new List<LaunchHotkeySettings>
+        {
+            new("Alt+T", "pwsh.exe", "-NoLogo", "C:\\Tools")
+        };
+
+        var settings = new RootlessWMSettings(
+            0.55,
+            0,
+            0,
+            Launch: launchEntries);
+
+        Assert.NotNull(settings.Launch);
+        Assert.Single(settings.Launch);
+        Assert.Equal("Alt+T", settings.Launch[0].Hotkey);
+        Assert.Equal("pwsh.exe", settings.Launch[0].Command);
+        Assert.Equal("-NoLogo", settings.Launch[0].Args);
+        Assert.Equal("C:\\Tools", settings.Launch[0].WorkingDirectory);
+    }
+
+    [Fact]
+    public void GlobalHotkeySource_TryGetLaunch_ReturnsConfiguredLaunch()
+    {
+        using var source = new GlobalHotkeySource();
+        var launchEntries = new List<LaunchHotkeySettings>
+        {
+            new("Alt+T", "pwsh.exe", "-NoLogo")
+        };
+
+        _ = source.Start(null, launchEntries);
+
+        Assert.True(source.TryGetLaunch(NativeMethods.WmHotkey, 1000, out var launch));
+        Assert.NotNull(launch);
+        Assert.Equal("Alt+T", launch.Hotkey);
+        Assert.Equal("pwsh.exe", launch.Command);
+        Assert.Equal("-NoLogo", launch.Args);
+
+        Assert.False(source.TryGetLaunch(NativeMethods.WmHotkey, 9999, out _));
+        Assert.False(source.TryGetLaunch(0x0000, 1000, out _));
+    }
+
     [Theory]
     [InlineData("Super+Enter")]
     [InlineData("Win+Enter")]

@@ -30,7 +30,29 @@ Hotkeys support modifier combinations using `Alt`, `Ctrl`, `Shift`, and `Win`/`S
 
 A shortcut registered by another application is skipped and reported in `management_started`; it does not stop the session.
 
+## Program Launch Hotkeys
+
+You can bind hotkeys to launch programs in `settings.toml` using `[[launch]]`:
+
+```toml
+[[launch]]
+hotkey = "Alt+T"
+command = "pwsh.exe"
+args = "-NoLogo"
+
+[[launch]]
+hotkey = "Alt+Return"
+command = "wt.exe"
+```
+
+| Key | Type | Description |
+| :--- | :--- | :--- |
+| `hotkey` | String | Key combination (e.g. `"Alt+T"`, `"Alt+Return"`). |
+| `command` | String | Executable name or file path to run. |
+| `args` | String (optional) | Command-line arguments. |
+| `working-directory` | String (optional) | Initial working directory. |
+
 ## See Also
 
-- [Configuration](configuration.md)
-- [Application Runner](runner.md)
+- [Configuration](docs/configuration.md)
+- [Application Runner](docs/runner.md)
