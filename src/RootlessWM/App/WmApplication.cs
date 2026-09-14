@@ -440,6 +440,11 @@ internal sealed class WmApplication
 
     private void ExecuteTilingCommand(TilingCommand command)
     {
+        if (command != TilingCommand.OpenRunner)
+        {
+            _runnerController?.Dismiss();
+        }
+
         if (command == TilingCommand.DisableManagement)
         {
             DisableManagement();
@@ -840,6 +845,7 @@ internal sealed class WmApplication
     private bool CanFocusWithMouse(nint windowHandle)
     {
         if (!_settings.FocusFollowsMouse
+            || _runnerController?.IsVisible == true
             || !_managementState.IsEnabled
             || !_windowTracker.Contains(windowHandle))
         {

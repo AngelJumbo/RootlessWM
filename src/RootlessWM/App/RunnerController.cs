@@ -22,6 +22,8 @@ internal sealed class RunnerController : IDisposable
         _log = log;
     }
 
+    public bool IsVisible => !_disposed && _form?.Visible == true;
+
     public void ApplySettings(RunnerSettings? settings)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -42,12 +44,18 @@ internal sealed class RunnerController : IDisposable
         _form.ApplySettings(_settings);
         if (_form.Visible)
         {
-            _form.Hide();
+            _form.Dismiss();
             return;
         }
 
         _form.ResetQuery();
         _form.ShowOnFocusedMonitor();
+    }
+
+    public void Dismiss()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        _form?.Dismiss();
     }
 
     public void Dispose()
@@ -96,6 +104,12 @@ internal sealed class RunnerController : IDisposable
             _selectedIndex = 0;
         }
 
+        public void Dismiss()
+        {
+            Hide();
+            ResetQuery();
+        }
+
         public void ShowOnFocusedMonitor()
         {
             var monitor = Screen.FromPoint(Cursor.Position).WorkingArea;
@@ -117,6 +131,12 @@ internal sealed class RunnerController : IDisposable
         }
 
         protected override bool ShowWithoutActivation => false;
+
+        protected override void OnDeactivate(EventArgs eventArgs)
+        {
+            base.OnDeactivate(eventArgs);
+            Dismiss();
+        }
 
         protected override CreateParams CreateParams
         {
@@ -146,8 +166,7 @@ internal sealed class RunnerController : IDisposable
             switch (eventArgs.KeyCode)
             {
                 case Keys.Escape:
-                    Hide();
-                    ResetQuery();
+                    Dismiss();
                     break;
                 case Keys.Back:
                     if (_query.Length > 0)
@@ -221,8 +240,7 @@ internal sealed class RunnerController : IDisposable
                     WorkingDirectory = selected?.WorkingDirectory ?? string.Empty,
                     UseShellExecute = true
                 });
-                Hide();
-                ResetQuery();
+                Dismiss();
                 _log.Info("runner_launched", new { name = selected?.Name ?? target, source = selected?.Source ?? "command" });
             }
             catch (Win32Exception exception)

@@ -63,7 +63,7 @@ The runner:
 - Filters results as you type.
 - Shows the associated Windows application icon when enabled.
 - Launches the selected result with `Enter`.
-- Supports `Up`/`Down` selection and `Escape` to close.
+- Supports `Up`/`Down` selection and closes with `Escape`, an outside click, or any other RootlessWM keybinding.
 - Accepts a typed executable, command, or URL when no discovered result is selected.
 - Supports configurable position, dimensions, fonts, borders, colors, transparency, row height, and icons.
 
