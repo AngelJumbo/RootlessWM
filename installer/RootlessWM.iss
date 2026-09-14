@@ -6,6 +6,7 @@
 #define AppPublisher "RootlessWM"
 #define AppExeName "RootlessWM.exe"
 #define PublishDir AddBackslash(SourcePath) + "..\\artifacts\\publish"
+#define ExampleSettingsPath AddBackslash(SourcePath) + "..\\settings.example.toml"
 
 [Setup]
 AppId={{B7A5A4B8-5EE6-4C02-AF0A-6D5B5E1D9C8F}
@@ -29,6 +30,7 @@ Name: "startupadmin"; Description: "Start as administrator (allows tiling elevat
 
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#ExampleSettingsPath}"; DestDir: "{localappdata}\RootlessWM"; DestName: "settings.toml"; Flags: onlyifdoesntexist uninsneveruninstall
 
 [Icons]
 Name: "{autoprograms}\RootlessWM"; Filename: "{app}\{#AppExeName}"; Parameters: "--manage --no-logs"; WorkingDir: "{app}"

@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Win32;
 using RootlessWM.Domain;
@@ -250,6 +251,21 @@ internal sealed class WmApplication
         }
     }
 
+    private void OpenSettings()
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(_settingsProvider.FilePath)
+            {
+                UseShellExecute = true
+            });
+        }
+        catch (Exception exception) when (exception is Win32Exception or InvalidOperationException)
+        {
+            _log.Error("settings_open_failed", new { path = _settingsProvider.FilePath, exception.Message });
+        }
+    }
+
     private void RunManageMode()
     {
         if (!TryLoadManagedWindowStates(out var pendingStates, "management"))
@@ -299,12 +315,8 @@ internal sealed class WmApplication
         using var trayController = new TrayController(
             ToggleManagement,
             ReloadSettingsAndHotkeys,
+            OpenSettings,
             eventSource.Stop,
-            command =>
-            {
-                ExecuteTilingCommand(command);
-                UpdateStatus(statusController);
-            },
             () => _managementState.IsEnabled);
         statusController = trayController;
         ConsoleCancelEventHandler cancelHandler = (_, eventArgs) =>
@@ -1392,7 +1404,10 @@ internal sealed class WmApplication
 
     private IReadOnlyList<TrackedWindow> RefreshTrackedWindows()
     {
-        var trackedWindows = _windowTracker.Seed(_windowEnumerator.GetTopLevelWindowHandles().Select(_windowInspector.Inspect));
+        var windows = _windowEnumerator.GetTopLevelWindowHandles()
+            .Select(handle => _windowInspector.TryInspect(handle, out var window) ? window : null)
+            .OfType<WindowCandidate>();
+        var trackedWindows = _windowTracker.Seed(windows);
         _tilingState.Synchronize(trackedWindows);
         return trackedWindows;
     }

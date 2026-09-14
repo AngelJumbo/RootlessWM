@@ -21,6 +21,8 @@ internal sealed class TomlSettingsProvider
         _filePath = filePath;
     }
 
+    internal string FilePath => _filePath;
+
     public RootlessWMSettings Load()
     {
         if (!File.Exists(_filePath))
