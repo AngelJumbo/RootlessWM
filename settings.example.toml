@@ -26,7 +26,7 @@ hide-explorer-on-start = false
 # Process names (no .exe suffix) to leave floating instead of tiling.
 # Useful for windows that auto-elevate (e.g. Task Manager on Windows 11): a non-elevated
 # RootlessWM cannot reposition them, so excluding them here avoids the wasted retile attempts.
-excluded-executables = ["Taskmgr"]
+# excluded-executables = ["Taskmgr"]
 
 [statusbar]
 visible = true
@@ -53,7 +53,7 @@ padding = { left = 4, right = 4 }
 
 [module.layout]
 type = "layout"
-symbols = { MasterLeft = "ML", MasterTop = "MT", monocle = "MON", floating = "FLT" }
+symbols = { MasterLeft = "[]=", MasterTop = "TTT", monocle = "MON", floating = "FLT" }
 
 [module.window-title]
 type = "window-title"

@@ -150,6 +150,11 @@ internal sealed class WorkspaceBarController : IDisposable
         var focusedWindowTitle = _getFocusedWindowTitle();
         foreach (var (handle, bar) in _bars)
         {
+            if (!bar.IsVisible)
+            {
+                continue;
+            }
+
             bar.UpdateWidgets(handle == focusedMonitorHandle, focusedWindowTitle);
         }
     }
@@ -168,10 +173,18 @@ internal sealed class WorkspaceBarController : IDisposable
 
     private sealed class WorkspaceBarView : IDisposable
     {
+        // Cached for the process lifetime: Skia typeface resolution is expensive and the set of
+        // font/size/colour combinations a bar uses is bounded by the configuration.
+        private static readonly Dictionary<(string FontFamily, SKFontStyleWeight Weight, SKFontStyleSlant Slant), SKTypeface> Typefaces = [];
+        private static readonly Dictionary<TextPaintKey, SKPaint> TextPaints = [];
+
         private readonly WorkspaceBarForm _form;
         private readonly List<(string Signature, IWidgetProvider Provider)> _widgetProviders = [];
         private readonly WorkspaceBarWidgetRegistry _widgetRegistry;
         private readonly ConsoleDiagnosticLog _log;
+        private readonly System.Text.StringBuilder _signatureBuilder = new();
+        private string? _lastRenderSignature;
+        private int _optionsRevision;
         private Rectangle _lastBounds = Rectangle.Empty;
         private WorkspaceBarStyleOptions _barStyle = WorkspaceBarStyleOptions.Default;
         private WorkspaceBarOptions _options = WorkspaceBarOptionsDefaults.Create();
@@ -200,8 +213,15 @@ internal sealed class WorkspaceBarController : IDisposable
 
         public int CurrentWorkspace => _currentWorkspace;
 
+        public bool IsVisible => _form.Visible;
+
         public void ApplyOptions(WorkspaceBarOptions options)
         {
+            if (!Equals(_options, options))
+            {
+                _optionsRevision++;
+            }
+
             _options = options;
             _barStyle = options.Style ?? WorkspaceBarStyleOptions.Default with { Background = options.Background };
             _form.Visible = options.Visible;
@@ -276,10 +296,24 @@ internal sealed class WorkspaceBarController : IDisposable
 
         private void Redraw()
         {
+            if (!_form.Visible)
+            {
+                _lastRenderSignature = null;
+                return;
+            }
+
             if (!_form.IsHandleCreated || _form.Width <= 0 || _form.Height <= 0)
             {
                 return;
             }
+
+            var signature = BuildRenderSignature();
+            if (string.Equals(signature, _lastRenderSignature, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _lastRenderSignature = signature;
 
             using var bitmap = new Bitmap(_form.Width, _form.Height, PixelFormat.Format32bppPArgb);
             var bitmapData = bitmap.LockBits(new Rectangle(0, 0, bitmap.Width, bitmap.Height), ImageLockMode.WriteOnly, bitmap.PixelFormat);
@@ -298,6 +332,92 @@ internal sealed class WorkspaceBarController : IDisposable
             }
 
             _form.UpdateLayer(bitmap);
+        }
+
+        // Everything that can change what the bar looks like, flattened into one comparable string so an
+        // unchanged tick can skip the Skia draw and the layered-window round trip entirely.
+        private string BuildRenderSignature()
+        {
+            var builder = _signatureBuilder;
+            builder.Clear();
+            builder.Append(_optionsRevision).Append('|')
+                .Append(_currentWorkspace).Append('|')
+                .Append((int)_layoutMode).Append('|')
+                .Append(_isFocused ? '1' : '0')
+                .Append(_isPrimary ? '1' : '0').Append('|')
+                .Append(_form.Width).Append('x').Append(_form.Height).Append('|');
+
+            if (_options.ModulesLeft is not null || _options.ModulesCenter is not null || _options.ModulesRight is not null)
+            {
+                AppendModuleSignature(builder, _options.ModulesLeft);
+                AppendModuleSignature(builder, _options.ModulesCenter);
+                AppendModuleSignature(builder, _options.ModulesRight);
+                return builder.ToString();
+            }
+
+            foreach (var section in _options.Sections ?? [])
+            {
+                if (!section.Style.Visible)
+                {
+                    continue;
+                }
+
+                builder.Append(section.Id).Append(':');
+                switch (section.Id.ToLowerInvariant())
+                {
+                    case "workspaces":
+                    case "layout":
+                        break;
+                    case "title":
+                        if (_isFocused)
+                        {
+                            builder.Append(_focusedWindowTitle);
+                        }
+
+                        break;
+                    default:
+                        if (_isFocused)
+                        {
+                            foreach (var widget in GetSectionWidgets(section))
+                            {
+                                builder.Append(GetOrCreateProvider(GetWidgetIndex(widget), widget)?.GetText()).Append('\u001f');
+                            }
+                        }
+
+                        break;
+                }
+
+                builder.Append('|');
+            }
+
+            return builder.ToString();
+        }
+
+        private void AppendModuleSignature(System.Text.StringBuilder builder, IReadOnlyList<WorkspaceBarModuleOptions>? modules)
+        {
+            foreach (var module in modules ?? [])
+            {
+                if (!module.Style.Visible || !module.IsShownOn(_isPrimary, _isFocused))
+                {
+                    continue;
+                }
+
+                builder.Append(module.Id).Append(':');
+                if (string.Equals(module.Type, "workspaces", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Covered by the workspace index already in the signature.
+                }
+                else if (string.Equals(module.Type, "layout", StringComparison.OrdinalIgnoreCase))
+                {
+                    builder.Append(GetLayoutText(module));
+                }
+                else
+                {
+                    builder.Append(GetModuleText(module));
+                }
+
+                builder.Append('|');
+            }
         }
 
         private void Draw(SKCanvas canvas, int width, int height)
@@ -617,7 +737,7 @@ internal sealed class WorkspaceBarController : IDisposable
                     continue;
                 }
 
-                using var paint = CreateSpanPaint(span, defaultColor, style, SKTextAlign.Left);
+                var paint = GetSpanPaint(span, defaultColor, style, SKTextAlign.Left);
                 var spanWidth = paint.MeasureText(span.Text);
                 var metrics = paint.FontMetrics;
                 var y = rect.MidY - ((metrics.Ascent + metrics.Descent) / 2F);
@@ -653,29 +773,59 @@ internal sealed class WorkspaceBarController : IDisposable
                     continue;
                 }
 
-                using var paint = CreateSpanPaint(span, defaultColor, style, SKTextAlign.Left);
+                var paint = GetSpanPaint(span, defaultColor, style, SKTextAlign.Left);
                 totalWidth += paint.MeasureText(span.Text);
             }
 
             return totalWidth;
         }
 
-        private static SKPaint CreateSpanPaint(StyledSpan span, Color defaultColor, WorkspaceBarStyleOptions style, SKTextAlign align = SKTextAlign.Left)
+        private readonly record struct TextPaintKey(
+            string FontFamily,
+            float TextSize,
+            SKFontStyleWeight Weight,
+            SKFontStyleSlant Slant,
+            uint Color,
+            SKTextAlign Align);
+
+        // Returns a shared, never-disposed paint: constructing one (and resolving its typeface) per span
+        // per frame was the dominant cost of the bar's redraw loop.
+        private static SKPaint GetSpanPaint(StyledSpan span, Color defaultColor, WorkspaceBarStyleOptions style, SKTextAlign align = SKTextAlign.Left)
         {
-            var color = span.Foreground ?? defaultColor;
-            var fontSize = span.FontSize ?? style.FontSize;
+            var color = ToSkColor(span.Foreground ?? defaultColor);
+            var textSize = (span.FontSize ?? style.FontSize) * 96F / 72F;
             var fontFamily = span.FontFamily ?? style.FontFamily;
             var weight = span.FontWeight ?? (style.FontStyle.HasFlag(FontStyle.Bold) ? SKFontStyleWeight.Bold : SKFontStyleWeight.Normal);
             var slant = span.FontSlant ?? (style.FontStyle.HasFlag(FontStyle.Italic) ? SKFontStyleSlant.Italic : SKFontStyleSlant.Upright);
+            var key = new TextPaintKey(fontFamily, textSize, weight, slant, (uint)color, align);
+            if (TextPaints.TryGetValue(key, out var cached))
+            {
+                return cached;
+            }
 
-            return new SKPaint
+            var paint = new SKPaint
             {
                 IsAntialias = true,
-                Color = ToSkColor(color),
-                TextSize = fontSize * 96F / 72F,
-                Typeface = SKTypeface.FromFamilyName(fontFamily, weight, SKFontStyleWidth.Normal, slant),
+                Color = color,
+                TextSize = textSize,
+                Typeface = GetTypeface(fontFamily, weight, slant),
                 TextAlign = align
             };
+            TextPaints[key] = paint;
+            return paint;
+        }
+
+        private static SKTypeface GetTypeface(string fontFamily, SKFontStyleWeight weight, SKFontStyleSlant slant)
+        {
+            var key = (fontFamily, weight, slant);
+            if (Typefaces.TryGetValue(key, out var cached))
+            {
+                return cached;
+            }
+
+            var typeface = SKTypeface.FromFamilyName(fontFamily, weight, SKFontStyleWidth.Normal, slant);
+            Typefaces[key] = typeface;
+            return typeface;
         }
 
         private static StyledText Ellipsize(StyledText styled, float maxWidth, WorkspaceBarStyleOptions style, Color defaultColor)
@@ -689,7 +839,7 @@ internal sealed class WorkspaceBarController : IDisposable
             if (styled.Spans.Count == 1)
             {
                 var singleSpan = styled.Spans[0];
-                using var paint = CreateSpanPaint(singleSpan, defaultColor, style, SKTextAlign.Left);
+                var paint = GetSpanPaint(singleSpan, defaultColor, style, SKTextAlign.Left);
                 return new StyledText([singleSpan with { Text = Ellipsize(singleSpan.Text, maxWidth, paint) }]);
             }
 
@@ -704,7 +854,7 @@ internal sealed class WorkspaceBarController : IDisposable
                     continue;
                 }
 
-                using var paint = CreateSpanPaint(span, defaultColor, style, SKTextAlign.Left);
+                var paint = GetSpanPaint(span, defaultColor, style, SKTextAlign.Left);
                 var spanWidth = paint.MeasureText(span.Text);
 
                 if (currentWidth + spanWidth <= maxWidth)
@@ -737,7 +887,7 @@ internal sealed class WorkspaceBarController : IDisposable
                         {
                             var lastIndex = resultSpans.Count - 1;
                             var lastSpan = resultSpans[lastIndex];
-                            using var lastPaint = CreateSpanPaint(lastSpan, defaultColor, style, SKTextAlign.Left);
+                            var lastPaint = GetSpanPaint(lastSpan, defaultColor, style, SKTextAlign.Left);
                             var available = maxWidth - (currentWidth - lastPaint.MeasureText(lastSpan.Text));
                             resultSpans[lastIndex] = lastSpan with { Text = Ellipsize(lastSpan.Text, available, lastPaint) };
                         }
