@@ -118,16 +118,17 @@ var
   ResultCode: Integer;
   UserName: String;
   ExePath: String;
+  PowerShellCommand: String;
 begin
   UserName := GetUserNameString();
   ExePath := ExpandConstant('{app}\{#AppExeName}');
 
+  { Create the scheduled task }
   Parameters :=
     '/Create ' +
     '/TN "' + ScheduledTaskName + '" ' +
     '/TR ""' + ExePath + '" --manage --no-logs" ' +
     '/SC ONLOGON ' +
-    '/DELAY 0000:10 ' +
     '/RU "' + UserName + '" ' +
     '/IT ' +
     '/RL HIGHEST ' +
@@ -154,6 +155,39 @@ begin
       'Unable to create the elevated RootlessWM startup task.' +
       Chr(13) + Chr(10) + Chr(13) + Chr(10) +
       'schtasks exit code: ' + IntToStr(ResultCode)
+    );
+  end;
+
+  { Configure power settings }
+  PowerShellCommand :=
+    '-NoProfile -ExecutionPolicy Bypass -Command ' +
+    '"$settings = New-ScheduledTaskSettingsSet ' +
+    '-AllowStartIfOnBatteries ' +
+    '-DontStopIfGoingOnBatteries; ' +
+    'Set-ScheduledTask -TaskName ''' + ScheduledTaskName + ''' ' +
+    '-Settings $settings"';
+
+  if not ShellExec(
+    'runas',
+    ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+    PowerShellCommand,
+    '',
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    ResultCode
+  ) then
+  begin
+    RaiseException(
+      'Unable to execute PowerShell while configuring the RootlessWM startup task.'
+    );
+  end;
+
+  if ResultCode <> 0 then
+  begin
+    RaiseException(
+      'Unable to configure the RootlessWM startup task power settings.' +
+      Chr(13) + Chr(10) + Chr(13) + Chr(10) +
+      'PowerShell exit code: ' + IntToStr(ResultCode)
     );
   end;
 end;
