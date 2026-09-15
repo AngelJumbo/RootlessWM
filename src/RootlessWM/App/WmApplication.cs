@@ -459,20 +459,23 @@ internal sealed class WmApplication
         _runnerController?.Dismiss();
         try
         {
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = launch.Command,
-                Arguments = launch.Args ?? string.Empty,
-                WorkingDirectory = launch.WorkingDirectory ?? string.Empty,
-                UseShellExecute = true
-            };
-
             if (launch.RunAsAdmin)
             {
-                startInfo.Verb = "runas";
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = launch.Command,
+                    Arguments = launch.Args ?? string.Empty,
+                    WorkingDirectory = launch.WorkingDirectory ?? string.Empty,
+                    UseShellExecute = true,
+                    Verb = "runas"
+                });
+            }
+            else
+            {
+                // Launch via explorer's shell so non-admin entries don't inherit RootlessWM's elevated token.
+                ShellProcessLauncher.LaunchDeElevated(launch.Command, launch.Args, launch.WorkingDirectory);
             }
 
-            Process.Start(startInfo);
             _log.Info("program_launched", new { hotkey = launch.Hotkey, command = launch.Command, args = launch.Args, admin = launch.RunAsAdmin });
         }
         catch (System.ComponentModel.Win32Exception exception)

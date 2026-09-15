@@ -233,13 +233,8 @@ internal sealed class RunnerController : IDisposable
 
             try
             {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = selected?.Target ?? target,
-                    Arguments = selected?.Arguments ?? string.Empty,
-                    WorkingDirectory = selected?.WorkingDirectory ?? string.Empty,
-                    UseShellExecute = true
-                });
+                // Launch via explorer's shell so results don't inherit RootlessWM's elevated token.
+                ShellProcessLauncher.LaunchDeElevated(selected?.Target ?? target, selected?.Arguments, selected?.WorkingDirectory);
                 Dismiss();
                 _log.Info("runner_launched", new { name = selected?.Name ?? target, source = selected?.Source ?? "command" });
             }
@@ -247,7 +242,7 @@ internal sealed class RunnerController : IDisposable
             {
                 _log.Error("runner_launch_failed", new { target, error = exception.NativeErrorCode });
             }
-            catch (InvalidOperationException exception)
+            catch (Exception exception) when (exception is InvalidOperationException or System.Runtime.InteropServices.COMException)
             {
                 _log.Error("runner_launch_failed", new { target, error = exception.Message });
             }
