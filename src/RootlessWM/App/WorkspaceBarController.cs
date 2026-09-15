@@ -183,8 +183,22 @@ internal sealed class WorkspaceBarController : IDisposable
         private readonly WorkspaceBarWidgetRegistry _widgetRegistry;
         private readonly ConsoleDiagnosticLog _log;
         private readonly System.Text.StringBuilder _signatureBuilder = new();
+        private readonly Dictionary<string, ModuleBinding> _moduleBindings = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, int> _widgetIndexes = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, string> _moduleTextCache = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, string> _widgetTextCache = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, IReadOnlyList<WorkspaceBarWidgetOptions>> _sectionWidgets = new(StringComparer.OrdinalIgnoreCase);
+        private readonly List<WorkspaceBarModuleOptions> _visibleModules = [];
+        private readonly List<float> _moduleWidths = [];
+        private readonly List<float> _sectionWidths = [];
+        private List<WorkspaceBarSectionOptions> _visibleSections = [];
+        private List<WorkspaceBarSectionOptions> _sectionsLeft = [];
+        private List<WorkspaceBarSectionOptions> _sectionsCenter = [];
+        private List<WorkspaceBarSectionOptions> _sectionsRight = [];
+        private Bitmap? _renderBitmap;
         private string? _lastRenderSignature;
         private int _optionsRevision;
+        private int _appliedCornerRadius = -1;
         private Rectangle _lastBounds = Rectangle.Empty;
         private WorkspaceBarStyleOptions _barStyle = WorkspaceBarStyleOptions.Default;
         private WorkspaceBarOptions _options = WorkspaceBarOptionsDefaults.Create();
@@ -217,26 +231,79 @@ internal sealed class WorkspaceBarController : IDisposable
 
         public void ApplyOptions(WorkspaceBarOptions options)
         {
-            if (!Equals(_options, options))
+            var changed = !Equals(_options, options);
+            if (changed)
             {
                 _optionsRevision++;
             }
 
             _options = options;
             _barStyle = options.Style ?? WorkspaceBarStyleOptions.Default with { Background = options.Background };
+            if (changed)
+            {
+                RebuildOptionCaches();
+            }
+
             _form.Visible = options.Visible;
             Redraw();
         }
 
-        private static Padding AddSpacing(Padding padding, int spacing)
-            => new(padding.Left + spacing, padding.Top, padding.Right + spacing, padding.Bottom);
+        // Everything derived purely from the configuration, resolved once per options change instead of per frame.
+        private void RebuildOptionCaches()
+        {
+            _moduleBindings.Clear();
+            var index = 0;
+            foreach (var module in EnumerateModules())
+            {
+                _moduleBindings[module.Id] = new ModuleBinding(index, CreateModuleWidgetOptions(module));
+                index++;
+            }
 
-        private static Padding AddBorder(Padding padding, int borderWidth)
+            _widgetIndexes.Clear();
+            for (var widgetIndex = 0; widgetIndex < _options.Widgets.Count; widgetIndex++)
+            {
+                _widgetIndexes[_options.Widgets[widgetIndex].Id] = widgetIndex;
+            }
+
+            var sections = (_options.Sections ?? []).Where(section => section.Style.Visible).ToList();
+            _visibleSections = sections;
+            _sectionsLeft = sections.Where(section => section.Alignment == WorkspaceBarSectionAlignment.Left).ToList();
+            _sectionsCenter = sections.Where(section => section.Alignment == WorkspaceBarSectionAlignment.Center).ToList();
+            _sectionsRight = sections.Where(section => section.Alignment == WorkspaceBarSectionAlignment.Right).ToList();
+
+            _sectionWidgets.Clear();
+            foreach (var section in sections)
+            {
+                _sectionWidgets[section.Id] = section.Widgets.Count == 0
+                    ? _options.Widgets
+                    : _options.Widgets
+                        .Where(widget => section.Widgets.Contains(widget.Id, StringComparer.OrdinalIgnoreCase)
+                            || section.Widgets.Contains(widget.Kind, StringComparer.OrdinalIgnoreCase))
+                        .ToList();
+            }
+        }
+
+        private IEnumerable<WorkspaceBarModuleOptions> EnumerateModules()
+            => (_options.ModulesLeft ?? []).Concat(_options.ModulesCenter ?? []).Concat(_options.ModulesRight ?? []);
+
+        private static WorkspaceBarWidgetOptions CreateModuleWidgetOptions(WorkspaceBarModuleOptions module)
             => new(
-                padding.Left + borderWidth,
-                padding.Top + borderWidth,
-                padding.Right + borderWidth,
-                padding.Bottom + borderWidth);
+                module.Type,
+                module.Symbol ?? "",
+                Color.Transparent,
+                module.Style.Foreground,
+                module.Style.Background,
+                module.Style.Foreground,
+                module.Text ?? "",
+                module.Command ?? "",
+                module.IntervalMilliseconds,
+                module.Style)
+            {
+                Id = module.Id,
+                BatterySymbols = module.BatterySymbols
+            };
+
+        private sealed record ModuleBinding(int Index, WorkspaceBarWidgetOptions Widget);
 
         public void Update(
             int currentWorkspace,
@@ -255,23 +322,23 @@ internal sealed class WorkspaceBarController : IDisposable
             var width = Math.Max(1, right - left);
             var barHeight = Math.Max(1, height);
             var top = workArea.Top + margin.Top;
-            _form.SetBounds(left, top, width, barHeight);
-            if (_form.IsHandleCreated)
-            {
-                _form.ApplyCornerPreference(_barStyle.BorderRadius);
-                NativeMethods.SetWindowPos(
-                    _form.Handle,
-                    nint.Zero,
-                    left,
-                    top,
-                    width,
-                    barHeight,
-                    NativeMethods.SwpNoActivate | NativeMethods.SwpNoZOrder);
-            }
             var bounds = new Rectangle(left, top, width, barHeight);
             if (bounds != _lastBounds)
             {
                 _lastBounds = bounds;
+                _form.SetBounds(left, top, width, barHeight);
+                if (_form.IsHandleCreated)
+                {
+                    NativeMethods.SetWindowPos(
+                        _form.Handle,
+                        nint.Zero,
+                        left,
+                        top,
+                        width,
+                        barHeight,
+                        NativeMethods.SwpNoActivate | NativeMethods.SwpNoZOrder);
+                }
+
                 _log.Info("workspace_bar_bounds", new
                 {
                     workArea,
@@ -281,6 +348,13 @@ internal sealed class WorkspaceBarController : IDisposable
                     actualRightGap = workArea.Left + workArea.Width - bounds.Right
                 });
             }
+
+            if (_form.IsHandleCreated && _appliedCornerRadius != _barStyle.BorderRadius)
+            {
+                _appliedCornerRadius = _barStyle.BorderRadius;
+                _form.ApplyCornerPreference(_barStyle.BorderRadius);
+            }
+
             _currentWorkspace = currentWorkspace;
             _layoutMode = layoutMode;
             _isPrimary = isPrimary;
@@ -315,7 +389,7 @@ internal sealed class WorkspaceBarController : IDisposable
 
             _lastRenderSignature = signature;
 
-            using var bitmap = new Bitmap(_form.Width, _form.Height, PixelFormat.Format32bppPArgb);
+            var bitmap = GetRenderBitmap(_form.Width, _form.Height);
             var bitmapData = bitmap.LockBits(new Rectangle(0, 0, bitmap.Width, bitmap.Height), ImageLockMode.WriteOnly, bitmap.PixelFormat);
             try
             {
@@ -334,10 +408,25 @@ internal sealed class WorkspaceBarController : IDisposable
             _form.UpdateLayer(bitmap);
         }
 
+        private Bitmap GetRenderBitmap(int width, int height)
+        {
+            if (_renderBitmap is { } bitmap && bitmap.Width == width && bitmap.Height == height)
+            {
+                return bitmap;
+            }
+
+            _renderBitmap?.Dispose();
+            _renderBitmap = new Bitmap(width, height, PixelFormat.Format32bppPArgb);
+            return _renderBitmap;
+        }
+
         // Everything that can change what the bar looks like, flattened into one comparable string so an
-        // unchanged tick can skip the Skia draw and the layered-window round trip entirely.
+        // unchanged tick can skip the Skia draw and the layered-window round trip entirely. Widget values are
+        // resolved here once per tick and reused by the measure and draw passes.
         private string BuildRenderSignature()
         {
+            _moduleTextCache.Clear();
+            _widgetTextCache.Clear();
             var builder = _signatureBuilder;
             builder.Clear();
             builder.Append(_optionsRevision).Append('|')
@@ -355,13 +444,8 @@ internal sealed class WorkspaceBarController : IDisposable
                 return builder.ToString();
             }
 
-            foreach (var section in _options.Sections ?? [])
+            foreach (var section in _visibleSections)
             {
-                if (!section.Style.Visible)
-                {
-                    continue;
-                }
-
                 builder.Append(section.Id).Append(':');
                 switch (section.Id.ToLowerInvariant())
                 {
@@ -380,7 +464,7 @@ internal sealed class WorkspaceBarController : IDisposable
                         {
                             foreach (var widget in GetSectionWidgets(section))
                             {
-                                builder.Append(GetOrCreateProvider(GetWidgetIndex(widget), widget)?.GetText()).Append('\u001f');
+                                builder.Append(ResolveWidgetText(widget)).Append('\u001f');
                             }
                         }
 
@@ -413,7 +497,7 @@ internal sealed class WorkspaceBarController : IDisposable
                 }
                 else
                 {
-                    builder.Append(GetModuleText(module));
+                    builder.Append(ResolveModuleText(module));
                 }
 
                 builder.Append('|');
@@ -433,17 +517,30 @@ internal sealed class WorkspaceBarController : IDisposable
                 return;
             }
 
-            var sections = (_options.Sections ?? []).Where(section => section.Style.Visible).ToList();
-            DrawSections(canvas, content, sections.Where(section => section.Alignment == WorkspaceBarSectionAlignment.Left).ToList(), WorkspaceBarSectionAlignment.Left);
-            DrawSections(canvas, content, sections.Where(section => section.Alignment == WorkspaceBarSectionAlignment.Right).ToList(), WorkspaceBarSectionAlignment.Right);
-            DrawSections(canvas, content, sections.Where(section => section.Alignment == WorkspaceBarSectionAlignment.Center).ToList(), WorkspaceBarSectionAlignment.Center);
+            DrawSections(canvas, content, _sectionsLeft, WorkspaceBarSectionAlignment.Left);
+            DrawSections(canvas, content, _sectionsRight, WorkspaceBarSectionAlignment.Right);
+            DrawSections(canvas, content, _sectionsCenter, WorkspaceBarSectionAlignment.Center);
         }
 
         private void DrawModuleGroup(SKCanvas canvas, SKRect content, IReadOnlyList<WorkspaceBarModuleOptions> modules, WorkspaceBarSectionAlignment alignment)
         {
-            var visible = modules.Where(module => module.Style.Visible && module.IsShownOn(_isPrimary, _isFocused)).ToList();
-            var widths = visible.Select(MeasureModule).ToList();
-            var totalWidth = widths.Sum() + Math.Max(0, widths.Count - 1) * _barStyle.Spacing;
+            _visibleModules.Clear();
+            _moduleWidths.Clear();
+            var totalWidth = 0F;
+            foreach (var module in modules)
+            {
+                if (!module.Style.Visible || !module.IsShownOn(_isPrimary, _isFocused))
+                {
+                    continue;
+                }
+
+                var moduleWidth = MeasureModule(module);
+                _visibleModules.Add(module);
+                _moduleWidths.Add(moduleWidth);
+                totalWidth += moduleWidth;
+            }
+
+            totalWidth += Math.Max(0, _moduleWidths.Count - 1) * _barStyle.Spacing;
             var x = alignment switch
             {
                 WorkspaceBarSectionAlignment.Right => content.Right - totalWidth,
@@ -451,10 +548,10 @@ internal sealed class WorkspaceBarController : IDisposable
                 _ => content.Left
             };
 
-            for (var index = 0; index < visible.Count; index++)
+            for (var index = 0; index < _visibleModules.Count; index++)
             {
-                var module = visible[index];
-                var width = Math.Min(widths[index], Math.Max(0, content.Right - x));
+                var module = _visibleModules[index];
+                var width = Math.Min(_moduleWidths[index], Math.Max(0, content.Right - x));
                 var rect = new SKRect(x, content.Top, x + width, content.Bottom);
                 DrawModule(canvas, module, rect, alignment);
                 x += width + _barStyle.Spacing;
@@ -522,32 +619,64 @@ internal sealed class WorkspaceBarController : IDisposable
         }
 
         private float MeasureWorkspaces(WorkspaceBarModuleOptions module)
-            => Enumerable.Range(0, WorkspaceCount)
-                .Sum(index => MeasureText(module.Labels is { Count: > 0 } labels && labels.Count > index ? labels[index] : (index + 1).ToString(), module.Style) + 12);
+        {
+            var labels = module.Labels ?? [];
+            var total = 0F;
+            for (var index = 0; index < WorkspaceCount; index++)
+            {
+                total += MeasureText(labels.Count > index ? labels[index] : (index + 1).ToString(), module.Style) + 12;
+            }
+
+            return total;
+        }
 
         private string GetModuleText(WorkspaceBarModuleOptions module)
+            => _moduleTextCache.TryGetValue(module.Id, out var cached) ? cached : ResolveModuleText(module);
+
+        private string ResolveModuleText(WorkspaceBarModuleOptions module)
         {
             if (string.Equals(module.Type, "window-title", StringComparison.OrdinalIgnoreCase))
             {
                 return _isFocused ? _focusedWindowTitle : string.Empty;
             }
 
-            var provider = GetOrCreateProvider(GetModuleIndex(module), new WorkspaceBarWidgetOptions(module.Type, module.Symbol ?? "", Color.Transparent, module.Style.Foreground, module.Style.Background, module.Style.Foreground, module.Text ?? "", module.Command ?? "", module.IntervalMilliseconds, module.Style) { Id = module.Id, BatterySymbols = module.BatterySymbols });
+            if (!_moduleBindings.TryGetValue(module.Id, out var binding))
+            {
+                return string.Empty;
+            }
+
+            var provider = GetOrCreateProvider(binding.Index, binding.Widget);
             var values = provider?.GetValues() ?? new Dictionary<string, string>();
-            return WorkspaceBarFormat.Format(module.Type, module.Format, values);
+            var text = WorkspaceBarFormat.Format(module.Type, module.Format, values);
+            _moduleTextCache[module.Id] = text;
+            return text;
         }
 
-        private int GetModuleIndex(WorkspaceBarModuleOptions module)
-            => (_options.ModulesLeft ?? []).Concat(_options.ModulesCenter ?? []).Concat(_options.ModulesRight ?? [])
-                .ToList().FindIndex(candidate => string.Equals(candidate.Id, module.Id, StringComparison.OrdinalIgnoreCase));
+        private string GetWidgetText(WorkspaceBarWidgetOptions widget)
+            => _widgetTextCache.TryGetValue(widget.Id, out var cached) ? cached : ResolveWidgetText(widget);
+
+        private string ResolveWidgetText(WorkspaceBarWidgetOptions widget)
+        {
+            var text = GetOrCreateProvider(GetWidgetIndex(widget), widget)?.GetText() ?? string.Empty;
+            _widgetTextCache[widget.Id] = text;
+            return text;
+        }
 
         private string GetLayoutText(WorkspaceBarModuleOptions module)
             => module.Symbols?.TryGetValue(_layoutMode, out var symbol) == true ? symbol : FormatLayoutMode(_layoutMode);
 
         private void DrawSections(SKCanvas canvas, SKRect content, IReadOnlyList<WorkspaceBarSectionOptions> sections, WorkspaceBarSectionAlignment alignment)
         {
-            var metrics = sections.Select(section => (Section: section, Width: MeasureSection(section))).ToList();
-            var totalWidth = metrics.Sum(item => item.Width) + Math.Max(0, metrics.Count - 1) * _barStyle.Spacing;
+            _sectionWidths.Clear();
+            var totalWidth = 0F;
+            foreach (var section in sections)
+            {
+                var sectionWidth = MeasureSection(section);
+                _sectionWidths.Add(sectionWidth);
+                totalWidth += sectionWidth;
+            }
+
+            totalWidth += Math.Max(0, _sectionWidths.Count - 1) * _barStyle.Spacing;
             var x = alignment switch
             {
                 WorkspaceBarSectionAlignment.Right => content.Right - totalWidth,
@@ -555,11 +684,11 @@ internal sealed class WorkspaceBarController : IDisposable
                 _ => content.Left
             };
 
-            foreach (var (section, measuredWidth) in metrics)
+            for (var index = 0; index < sections.Count; index++)
             {
-                var width = Math.Min(measuredWidth, content.Width);
+                var width = Math.Min(_sectionWidths[index], content.Width);
                 var rect = new SKRect(x, content.Top, x + width, content.Bottom);
-                DrawSection(canvas, section, rect);
+                DrawSection(canvas, sections[index], rect);
                 x += width + _barStyle.Spacing;
             }
         }
@@ -642,7 +771,7 @@ internal sealed class WorkspaceBarController : IDisposable
             {
                 var widget = widgets[index];
                 var style = widget.Style ?? sectionStyle;
-                var text = GetOrCreateProvider(GetWidgetIndex(widget), widget)?.GetText() ?? string.Empty;
+                var text = GetWidgetText(widget);
                 var symbolWidth = string.IsNullOrEmpty(widget.Symbol) ? 0 : MeasureText(widget.Symbol, style) + 6;
                 var width = widgetWidths[index];
                 var widgetRect = new SKRect(x, rect.Top, x + width, rect.Bottom);
@@ -659,21 +788,36 @@ internal sealed class WorkspaceBarController : IDisposable
         }
 
         private IReadOnlyList<WorkspaceBarWidgetOptions> GetSectionWidgets(WorkspaceBarSectionOptions section)
-            => section.Widgets.Count == 0
-                ? _options.Widgets
-                : _options.Widgets.Where(widget => section.Widgets.Contains(widget.Id, StringComparer.OrdinalIgnoreCase) || section.Widgets.Contains(widget.Kind, StringComparer.OrdinalIgnoreCase)).ToList();
+            => _sectionWidgets.TryGetValue(section.Id, out var widgets) ? widgets : _options.Widgets;
 
         private float MeasureWorkspaces(WorkspaceBarStyleOptions style)
-            => Enumerable.Range(0, WorkspaceCount)
-                .Sum(index => MeasureText(_options.Workspaces.Symbols.Count > index ? _options.Workspaces.Symbols[index] : (index + 1).ToString(), style) + 12);
+        {
+            var symbols = _options.Workspaces.Symbols;
+            var total = 0F;
+            for (var index = 0; index < WorkspaceCount; index++)
+            {
+                total += MeasureText(symbols.Count > index ? symbols[index] : (index + 1).ToString(), style) + 12;
+            }
+
+            return total;
+        }
 
         private float MeasureWidgets(WorkspaceBarSectionOptions section, WorkspaceBarStyleOptions sectionStyle)
-            => GetSectionWidgets(section).Sum(widget => MeasureWidget(widget, sectionStyle) + _barStyle.Spacing);
+        {
+            var widgets = GetSectionWidgets(section);
+            var total = 0F;
+            for (var index = 0; index < widgets.Count; index++)
+            {
+                total += MeasureWidget(widgets[index], sectionStyle) + _barStyle.Spacing;
+            }
+
+            return total;
+        }
 
         private float MeasureWidget(WorkspaceBarWidgetOptions widget, WorkspaceBarStyleOptions sectionStyle)
         {
             var style = widget.Style ?? sectionStyle;
-            var text = GetOrCreateProvider(GetWidgetIndex(widget), widget)?.GetText() ?? string.Empty;
+            var text = GetWidgetText(widget);
             return MeasureText(widget.Symbol, style) + MeasureText(text, style) + style.Padding.Left + style.Padding.Right + 6;
         }
 
@@ -964,37 +1108,8 @@ internal sealed class WorkspaceBarController : IDisposable
             return _widgetProviders[index].Provider;
         }
 
-        private bool IsSectionVisible(string id)
-            => (_options.Sections ?? []).FirstOrDefault(section =>
-                string.Equals(section.Id, id, StringComparison.OrdinalIgnoreCase))?.Style.Visible ?? true;
-
-        private WorkspaceBarStyleOptions GetSectionStyle(string id)
-            => (_options.Sections ?? []).FirstOrDefault(section =>
-                string.Equals(section.Id, id, StringComparison.OrdinalIgnoreCase))?.Style ?? _barStyle;
-
-        private bool IsWidgetShown(WorkspaceBarWidgetOptions widget)
-        {
-            var section = (_options.Sections ?? []).FirstOrDefault(candidate =>
-                string.Equals(candidate.Id, "widgets", StringComparison.OrdinalIgnoreCase) ||
-                candidate.Widgets.Contains(widget.Id, StringComparer.OrdinalIgnoreCase) ||
-                candidate.Widgets.Contains(widget.Kind, StringComparer.OrdinalIgnoreCase));
-            return section is null || section.Widgets.Count == 0 ||
-                section.Widgets.Contains(widget.Id, StringComparer.OrdinalIgnoreCase) ||
-                section.Widgets.Contains(widget.Kind, StringComparer.OrdinalIgnoreCase);
-        }
-
         private int GetWidgetIndex(WorkspaceBarWidgetOptions widget)
-        {
-            for (var index = 0; index < _options.Widgets.Count; index++)
-            {
-                if (ReferenceEquals(_options.Widgets[index], widget) || _options.Widgets[index].Id == widget.Id)
-                {
-                    return index;
-                }
-            }
-
-            return 0;
-        }
+            => _widgetIndexes.TryGetValue(widget.Id, out var index) ? index : 0;
 
         private static string FormatLayoutMode(MasterStackLayoutMode mode)
         {
@@ -1015,6 +1130,7 @@ internal sealed class WorkspaceBarController : IDisposable
                 (provider as IDisposable)?.Dispose();
             }
 
+            _renderBitmap?.Dispose();
             _form.Dispose();
         }
 

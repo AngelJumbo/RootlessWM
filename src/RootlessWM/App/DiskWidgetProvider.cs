@@ -2,43 +2,35 @@ namespace RootlessWM.App;
 
 internal sealed class DiskWidgetProvider : IWidgetProvider
 {
+    private static readonly TimeSpan SampleInterval = TimeSpan.FromSeconds(10);
+
+    private readonly Dictionary<string, string> _empty = new(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyDictionary<string, string>? _cachedValues;
+    private DateTimeOffset _lastSampleTime;
+
     public string Key => "disk";
 
-    public string GetText()
-    {
-        var root = Path.GetPathRoot(Environment.SystemDirectory);
-        if (root is null)
-        {
-            return string.Empty;
-        }
-
-        try
-        {
-            var drive = new DriveInfo(root);
-            if (!drive.IsReady || drive.TotalSize == 0)
-            {
-                return string.Empty;
-            }
-
-            var usedPercent = (drive.TotalSize - drive.AvailableFreeSpace) * 100.0 / drive.TotalSize;
-            return $" {root.TrimEnd('\\')} {usedPercent:0}%";
-        }
-        catch (IOException)
-        {
-            return string.Empty;
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return string.Empty;
-        }
-    }
+    public string GetText() => GetValues().TryGetValue("output", out var output) ? output : string.Empty;
 
     public IReadOnlyDictionary<string, string> GetValues()
     {
+        var now = DateTimeOffset.UtcNow;
+        if (_cachedValues is not null && now - _lastSampleTime < SampleInterval)
+        {
+            return _cachedValues;
+        }
+
+        _lastSampleTime = now;
+        _cachedValues = Sample();
+        return _cachedValues;
+    }
+
+    private IReadOnlyDictionary<string, string> Sample()
+    {
         var root = Path.GetPathRoot(Environment.SystemDirectory);
         if (root is null)
         {
-            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            return _empty;
         }
 
         try
@@ -46,28 +38,29 @@ internal sealed class DiskWidgetProvider : IWidgetProvider
             var drive = new DriveInfo(root);
             if (!drive.IsReady || drive.TotalSize == 0)
             {
-                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                return _empty;
             }
 
+            var label = root.TrimEnd('\\');
             var used = drive.TotalSize - drive.AvailableFreeSpace;
             var percent = used * 100.0 / drive.TotalSize;
             return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["root"] = root.TrimEnd('\\'),
+                ["root"] = label,
                 ["used_percent"] = percent.ToString("0", System.Globalization.CultureInfo.InvariantCulture),
                 ["used_bytes"] = used.ToString(),
                 ["free_bytes"] = drive.AvailableFreeSpace.ToString(),
                 ["total_bytes"] = drive.TotalSize.ToString(),
-                ["output"] = $" {root.TrimEnd('\\')} {percent:0}%"
+                ["output"] = $" {label} {percent:0}%"
             };
         }
         catch (IOException)
         {
-            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            return _empty;
         }
         catch (UnauthorizedAccessException)
         {
-            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            return _empty;
         }
     }
 }
