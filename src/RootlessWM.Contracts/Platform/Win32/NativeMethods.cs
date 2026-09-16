@@ -262,6 +262,20 @@ internal static class NativeMethods
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool AttachThreadInput(uint threadIdAttach, uint threadIdAttachTo, bool attach);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool BringWindowToTop(nint windowHandle);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    internal static extern nint SetActiveWindow(nint windowHandle);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    internal static extern nint SetFocus(nint windowHandle);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool SetCursorPos(int x, int y);
 
     [DllImport("user32.dll", SetLastError = true)]

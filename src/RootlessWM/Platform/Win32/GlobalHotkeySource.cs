@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.InteropServices;
 using RootlessWM.App;
 using RootlessWM.Domain;
 
@@ -60,7 +61,10 @@ internal sealed class GlobalHotkeySource : IDisposable
 
     private readonly HashSet<int> _registeredIdentifiers = [];
     private readonly Dictionary<int, LaunchHotkeySettings> _launchBindings = [];
+    private readonly List<string> _unavailableLaunchHotkeys = [];
     private bool _disposed;
+
+    public IReadOnlyList<string> UnavailableLaunchHotkeys => _unavailableLaunchHotkeys;
 
     public IReadOnlyList<TilingCommand> Start(
         IReadOnlyDictionary<string, string>? overrides,
@@ -87,12 +91,14 @@ internal sealed class GlobalHotkeySource : IDisposable
             {
                 if (!TryParseBinding(launch.Hotkey, out var modifiers, out var virtualKey))
                 {
+                    _unavailableLaunchHotkeys.Add($"{launch.Hotkey} (invalid binding)");
                     continue;
                 }
 
                 var identifier = nextIdentifier++;
                 if (!NativeMethods.RegisterHotKey(nint.Zero, identifier, modifiers, virtualKey))
                 {
+                    _unavailableLaunchHotkeys.Add($"{launch.Hotkey} (Win32 error {Marshal.GetLastWin32Error()})");
                     continue;
                 }
 
@@ -218,6 +224,7 @@ internal sealed class GlobalHotkeySource : IDisposable
 
         _registeredIdentifiers.Clear();
         _launchBindings.Clear();
+        _unavailableLaunchHotkeys.Clear();
         _disposed = true;
     }
 }
