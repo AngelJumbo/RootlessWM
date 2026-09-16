@@ -210,6 +210,9 @@ internal sealed class WmApplication
 
     private bool StartWindowManagerHelper()
     {
+#if DEBUG
+        return StartDevelopmentWindowManagerHelper();
+#else
         try
         {
             using var process = Process.Start(new ProcessStartInfo(
@@ -220,14 +223,61 @@ internal sealed class WmApplication
                 CreateNoWindow = true
             });
             process?.WaitForExit();
-            return process?.ExitCode == 0;
+            if (process?.ExitCode == 0)
+            {
+                return true;
+            }
+
+            return false;
         }
         catch (Win32Exception exception)
         {
             _log.Error("helper_start_failed", new { exception = exception.NativeErrorCode });
             return false;
         }
+#endif
     }
+
+#if DEBUG
+    private bool StartDevelopmentWindowManagerHelper()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "RootlessWM.sln")))
+        {
+            directory = directory.Parent;
+        }
+
+        var helperPath = directory is null
+            ? null
+            : Path.Combine(
+                directory.FullName,
+                "src",
+                "RootlessWM.WindowManager",
+                "bin",
+                "Debug",
+                "net9.0-windows",
+                "RootlessWM.WindowManager.exe");
+        if (helperPath is null || !File.Exists(helperPath))
+        {
+            _log.Error("development_helper_missing", new { path = helperPath });
+            return false;
+        }
+
+        try
+        {
+            return Process.Start(new ProcessStartInfo(helperPath, "--manage")
+            {
+                UseShellExecute = true,
+                Verb = "runas"
+            }) is not null;
+        }
+        catch (Win32Exception exception)
+        {
+            _log.Error("development_helper_start_failed", new { exception = exception.NativeErrorCode });
+            return false;
+        }
+    }
+#endif
 
     private static bool WaitForHelper(WindowManagerClient client)
     {
