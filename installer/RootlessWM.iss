@@ -57,28 +57,23 @@ var
   ResultCode: Integer;
   UserName: String;
   ExePath: String;
-  WorkingDirectory: String;
+  PowerShellCommand: String;
 begin
   UserName := GetUserNameString();
   ExePath := ExpandConstant('{app}\{#WindowManagerExeName}');
-  WorkingDirectory := ExpandConstant('{app}');
   Parameters :=
-    '-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ' +
-    '"$action = New-ScheduledTaskAction -Execute ' + QuotePowerShellLiteral(ExePath) +
-    ' -Argument ''--manage --no-logs'' -WorkingDirectory ' + QuotePowerShellLiteral(WorkingDirectory) + '; ' +
-    '$trigger = New-ScheduledTaskTrigger -AtLogOn -User ' + QuotePowerShellLiteral(UserName) + '; ' +
-    '$principal = New-ScheduledTaskPrincipal -UserId ' + QuotePowerShellLiteral(UserName) +
-    ' -LogonType Interactive -RunLevel Highest; ' +
-    '$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries ' +
-    '-DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero); ' +
-    'Register-ScheduledTask -TaskName ' + QuotePowerShellLiteral(ScheduledTaskName) +
-    ' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null; ' +
-    'Unregister-ScheduledTask -TaskName ' + QuotePowerShellLiteral(LegacyScheduledTaskName) +
-    ' -Confirm:$false -ErrorAction SilentlyContinue"';
+    '/Create ' +
+    '/TN "' + ScheduledTaskName + '" ' +
+    '/TR ""' + ExePath + '" --manage --no-logs" ' +
+    '/SC ONLOGON ' +
+    '/RU "' + UserName + '" ' +
+    '/IT ' +
+    '/RL HIGHEST ' +
+    '/F';
 
   if not ShellExec(
     'runas',
-    ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+    ExpandConstant('{sys}\schtasks.exe'),
     Parameters,
     '',
     SW_HIDE,
@@ -86,13 +81,44 @@ begin
     ResultCode
   ) then
   begin
-    RaiseException('Unable to configure the elevated RootlessWM window-manager task.');
+    RaiseException('Unable to create the elevated RootlessWM window-manager task.');
   end;
 
   if ResultCode <> 0 then
   begin
     RaiseException(
-      'Unable to configure the elevated RootlessWM window-manager task.' +
+      'Unable to create the elevated RootlessWM window-manager task.' +
+      Chr(13) + Chr(10) + Chr(13) + Chr(10) +
+      'schtasks exit code: ' + IntToStr(ResultCode)
+    );
+  end;
+
+  PowerShellCommand :=
+    '-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ' +
+    '"$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries ' +
+    '-DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero); ' +
+    'Set-ScheduledTask -TaskName ' + QuotePowerShellLiteral(ScheduledTaskName) +
+    ' -Settings $settings | Out-Null; ' +
+    'Unregister-ScheduledTask -TaskName ' + QuotePowerShellLiteral(LegacyScheduledTaskName) +
+    ' -Confirm:$false -ErrorAction SilentlyContinue"';
+
+  if not ShellExec(
+    'runas',
+    ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+    PowerShellCommand,
+    '',
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    ResultCode
+  ) then
+  begin
+    RaiseException('Unable to configure the RootlessWM window-manager task power settings.');
+  end;
+
+  if ResultCode <> 0 then
+  begin
+    RaiseException(
+      'Unable to configure the RootlessWM window-manager task power settings.' +
       Chr(13) + Chr(10) + Chr(13) + Chr(10) +
       'PowerShell exit code: ' + IntToStr(ResultCode)
     );
