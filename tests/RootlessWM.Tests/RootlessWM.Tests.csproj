@@ -13,5 +13,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\RootlessWM\RootlessWM.csproj" />
+    <ProjectReference Include="..\..\src\RootlessWM.Contracts\RootlessWM.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\RootlessWM.WindowManager\RootlessWM.WindowManager.csproj" />
   </ItemGroup>
 </Project>
