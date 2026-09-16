@@ -175,14 +175,14 @@ Status as of 2026-09-16:
 | 2. Move management ownership | Complete | `WindowManagerHost` owns management state, hooks, tiling, workspaces, persistence, and Win32 window operations. `WmApplication` owns hotkeys, bar, runner, tray, and application launching. |
 | 3. Add transport | Partial | Client and server exist and use JSON lines over a named pipe. The implemented pipe is `RootlessWM.WindowManager`, not session-specific. The ACL grants the current identity and interactive users. No focused IPC tests were added. |
 | 4. Replace direct calls | Complete with additions | Management commands and status use IPC. `ReloadSettings` and `Shutdown` were also implemented. |
-| 5. Install both modes | Partial | Publishing places both executables in one folder and the installer wildcard includes them. The installer does not create the elevated scheduled task or remove it during uninstall. |
+| 5. Install both modes | Complete, smoke test pending | The installer creates `RootlessWM.WindowManager` at logon with highest privileges, interactive logon, battery-safe settings, and no execution time limit. It removes the task during uninstall and removes the legacy `RootlessWM` task during upgrade. |
 
 Automated verification repeated on 2026-09-16:
 
 - `dotnet build RootlessWM.sln`: passed with 0 errors.
 - `dotnet test tests/RootlessWM.Tests/RootlessWM.Tests.csproj`: 198 tests passed.
 
-The main completion criterion is not met yet. `WmApplication` currently starts `RootlessWM.WindowManager.exe --manage` using `Verb = "runas"`, so every normal application start requests UAC consent. The scheduled-task startup required for no-UAC logon has not been implemented or tested.
+`WmApplication` now starts the installed `RootlessWM.WindowManager` task with `schtasks /Run`, avoiding a runtime UAC prompt. Installer compilation and the final no-UAC smoke test remain pending on a machine with Inno Setup installed.
 
 ## Deliberate Non-Goals
 
@@ -218,7 +218,7 @@ Pass criteria:
 - All tests pass.
 - `artifacts\publish` contains both `RootlessWM.exe` and `RootlessWM.WindowManager.exe`.
 
-### Current implementation smoke test
+### Installed implementation smoke test
 
 1. Stop existing RootlessWM processes:
 
@@ -232,7 +232,7 @@ Pass criteria:
         Start-Process .\artifacts\publish\RootlessWM.exe -ArgumentList '--manage'
         ```
 
-3. Accept the UAC prompt. This prompt is expected in the current implementation and proves the helper is started through `runas`; it is not the final desired behavior.
+3. Confirm no UAC prompt appears. The normal process starts the preinstalled elevated helper task.
 4. In Task Manager, enable the **Elevated** column on the **Details** tab. Confirm `RootlessWM.exe` is not elevated and `RootlessWM.WindowManager.exe` is elevated.
 5. Open several normal windows. Exercise enable/disable management, focus next/previous, move, resize, layout, workspace, fullscreen, runner, and status-bar hotkeys.
 6. Run Task Manager elevated and confirm its window can be focused, moved, and tiled by RootlessWM.

@@ -8,9 +8,9 @@ namespace RootlessWM.App;
 
 internal sealed class WmApplication
 {
+    private const string WindowManagerTaskName = "RootlessWM.WindowManager";
     private static readonly TimeSpan HelperConnectTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan HelperConnectPollInterval = TimeSpan.FromMilliseconds(200);
-    private static readonly TimeSpan HelperExitTimeout = TimeSpan.FromSeconds(5);
 
     private ConsoleDiagnosticLog _log = new();
     private readonly MonitorCatalog _monitorCatalog = new();
@@ -62,18 +62,17 @@ internal sealed class WmApplication
 
     private void RunManageMode()
     {
-        Process? helperProcess = StartWindowManagerHelper();
-        if (helperProcess is null)
+        var client = new WindowManagerClient(_log);
+        if (client.GetStatus() is null && !StartWindowManagerHelper())
         {
             _log.Error("management_blocked", new { reason = "helper_start_failed" });
             return;
         }
 
-        var client = new WindowManagerClient(_log);
         _windowManagerClient = client;
         try
         {
-            if (!WaitForHelper(client, helperProcess))
+            if (!WaitForHelper(client))
             {
                 _log.Error("management_blocked", new { reason = "helper_unreachable" });
                 return;
@@ -205,53 +204,36 @@ internal sealed class WmApplication
             _runnerController = null;
             _workspaceBar = null;
             client.Shutdown();
-            try
-            {
-                _ = helperProcess.WaitForExit((int)HelperExitTimeout.TotalMilliseconds);
-            }
-            catch (InvalidOperationException)
-            {
-            }
-
             _windowManagerClient = null;
         }
     }
 
-    private Process? StartWindowManagerHelper()
+    private bool StartWindowManagerHelper()
     {
-        var helperPath = Path.Combine(AppContext.BaseDirectory, "RootlessWM.WindowManager.exe");
-        if (!File.Exists(helperPath))
-        {
-            _log.Error("helper_executable_missing", new { path = helperPath });
-            return null;
-        }
-
         try
         {
-            var startInfo = new ProcessStartInfo(helperPath, "--manage")
+            using var process = Process.Start(new ProcessStartInfo(
+                Path.Combine(Environment.SystemDirectory, "schtasks.exe"),
+                $"/Run /TN \"{WindowManagerTaskName}\"")
             {
-                UseShellExecute = true,
-                Verb = "runas"
-            };
-            return Process.Start(startInfo);
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+            process?.WaitForExit();
+            return process?.ExitCode == 0;
         }
         catch (Win32Exception exception)
         {
             _log.Error("helper_start_failed", new { exception = exception.NativeErrorCode });
-            return null;
+            return false;
         }
     }
 
-    private static bool WaitForHelper(WindowManagerClient client, Process helperProcess)
+    private static bool WaitForHelper(WindowManagerClient client)
     {
         var deadline = DateTime.UtcNow + HelperConnectTimeout;
         while (DateTime.UtcNow < deadline)
         {
-            if (helperProcess.HasExited)
-            {
-                return false;
-            }
-
             if (client.GetStatus() is not null)
             {
                 return true;
