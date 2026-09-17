@@ -43,7 +43,6 @@ Filename: "{app}\{#AppExeName}"; Parameters: "--manage --no-logs"; WorkingDir: "
 [Code]
 const
   ScheduledTaskName = 'RootlessWM.WindowManager';
-  LegacyScheduledTaskName = 'RootlessWM';
 
 function QuotePowerShellLiteral(Value: String): String;
 begin
@@ -93,14 +92,16 @@ begin
     );
   end;
 
+  { Configure power settings }
   PowerShellCommand :=
-    '-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ' +
-    '"$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries ' +
-    '-DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero); ' +
-    'Set-ScheduledTask -TaskName ' + QuotePowerShellLiteral(ScheduledTaskName) +
-    ' -Settings $settings | Out-Null; ' +
-    'Unregister-ScheduledTask -TaskName ' + QuotePowerShellLiteral(LegacyScheduledTaskName) +
-    ' -Confirm:$false -ErrorAction SilentlyContinue"';
+    '-NoProfile -ExecutionPolicy Bypass -Command ' +
+    '"$settings = New-ScheduledTaskSettingsSet ' +
+    '-AllowStartIfOnBatteries ' +
+    '-DontStopIfGoingOnBatteries ' +
+    '-MultipleInstances IgnoreNew ' +
+    '-ExecutionTimeLimit ([TimeSpan]::Zero); ' +
+    'Set-ScheduledTask -TaskName ''' + ScheduledTaskName + ''' ' +
+    '-Settings $settings"';
 
   if not ShellExec(
     'runas',
@@ -112,17 +113,20 @@ begin
     ResultCode
   ) then
   begin
-    RaiseException('Unable to configure the RootlessWM window-manager task power settings.');
+    RaiseException(
+      'Unable to execute PowerShell while configuring the RootlessWM startup task.'
+    );
   end;
 
   if ResultCode <> 0 then
   begin
     RaiseException(
-      'Unable to configure the RootlessWM window-manager task power settings.' +
+      'Unable to configure the RootlessWM startup task power settings.' +
       Chr(13) + Chr(10) + Chr(13) + Chr(10) +
       'PowerShell exit code: ' + IntToStr(ResultCode)
     );
   end;
+
 end;
 
 procedure DeleteScheduledTask();

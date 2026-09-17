@@ -89,6 +89,9 @@ internal static class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool AttachConsole(uint processId);
 
+    [DllImport("kernel32.dll")]
+    internal static extern nint GetConsoleWindow();
+
     [StructLayout(LayoutKind.Sequential)]
     internal struct MemoryStatusEx
     {

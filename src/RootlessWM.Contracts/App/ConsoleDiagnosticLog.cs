@@ -1,4 +1,5 @@
 using System.Text.Json;
+using RootlessWM.Platform.Win32;
 
 namespace RootlessWM.App;
 
@@ -13,6 +14,9 @@ internal sealed class ConsoleDiagnosticLog
         "RootlessWM.log");
 
     private static readonly object FileGate = new();
+
+    // Writing to a console the user can select text in (QuickEdit) blocks the process, so only write when one exists.
+    private static readonly bool HasConsole = NativeMethods.GetConsoleWindow() != nint.Zero;
 
     private readonly bool _writeToFile;
 
@@ -43,8 +47,11 @@ internal sealed class ConsoleDiagnosticLog
 
         var line = JsonSerializer.Serialize(entry);
 
-        // Only visible when launched from an existing console (for example, dotnet run).
-        Console.WriteLine(line);
+        if (HasConsole)
+        {
+            Console.WriteLine(line);
+        }
+
         if (_writeToFile)
         {
             AppendToFile(line);
