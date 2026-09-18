@@ -314,30 +314,30 @@ public sealed class RootlessWMSettingsTests
     }
 
     [Fact]
-    public void ReserveTopSpace_VisibleBar_OffsetsAndShrinksWorkArea()
+    public void Reserve_VisibleBar_OffsetsAndShrinksWorkArea()
     {
         var options = new RootlessWMSettings(0.55, 0, 0, WorkspaceBar: new WorkspaceBarSettings(Visible: true, Height: 24))
             .ToWorkspaceBarOptions();
 
-        var reserved = options.ReserveTopSpace(new WindowBounds(100, 200, 800, 600));
+        var reserved = options.Reserve(new WindowBounds(100, 200, 800, 600));
 
         Assert.Equal(new WindowBounds(100, 224, 800, 576), reserved);
     }
 
     [Fact]
-    public void ReserveTopSpace_HiddenBar_DoesNotChangeWorkArea()
+    public void Reserve_HiddenBar_DoesNotChangeWorkArea()
     {
         var options = new RootlessWMSettings(0.55, 0, 0, WorkspaceBar: new WorkspaceBarSettings(Visible: false))
             .ToWorkspaceBarOptions();
         var workArea = new WindowBounds(100, 200, 800, 600);
 
-        var reserved = options.ReserveTopSpace(workArea);
+        var reserved = options.Reserve(workArea);
 
         Assert.Equal(workArea, reserved);
     }
 
     [Fact]
-    public void ReserveTopSpace_WithBarMargin_ReservesTransparentSeparation()
+    public void Reserve_WithBarMargin_ReservesTransparentSeparation()
     {
         var options = new RootlessWMSettings(
             0.55,
@@ -348,9 +348,64 @@ public sealed class RootlessWMSettingsTests
                 Style: new WorkspaceBarStyleSettings(MarginTop: 2, MarginBottom: 2, MarginLeft: 8, MarginRight: 8)))
             .ToWorkspaceBarOptions();
 
-        var reserved = options.ReserveTopSpace(new WindowBounds(100, 200, 800, 600));
+        var reserved = options.Reserve(new WindowBounds(100, 200, 800, 600));
 
         Assert.Equal(new WindowBounds(100, 232, 800, 568), reserved);
+    }
+
+    [Theory]
+    [InlineData("left")]
+    [InlineData("Left")]
+    public void Reserve_LeftPosition_OffsetsAndShrinksWorkArea(string position)
+    {
+        var options = new RootlessWMSettings(0.55, 0, 0, WorkspaceBar: new WorkspaceBarSettings(Visible: true, Height: 24, Position: position))
+            .ToWorkspaceBarOptions();
+
+        var reserved = options.Reserve(new WindowBounds(100, 200, 800, 600));
+
+        Assert.Equal(new WindowBounds(124, 200, 776, 600), reserved);
+        Assert.True(options.IsVertical);
+    }
+
+    [Fact]
+    public void Reserve_RightPosition_OffsetsAndShrinksWorkArea()
+    {
+        var options = new RootlessWMSettings(0.55, 0, 0, WorkspaceBar: new WorkspaceBarSettings(Visible: true, Height: 24, Position: "right"))
+            .ToWorkspaceBarOptions();
+
+        var reserved = options.Reserve(new WindowBounds(100, 200, 800, 600));
+
+        Assert.Equal(new WindowBounds(100, 200, 776, 600), reserved);
+    }
+
+    [Fact]
+    public void Reserve_BottomPosition_OffsetsAndShrinksWorkArea()
+    {
+        var options = new RootlessWMSettings(0.55, 0, 0, WorkspaceBar: new WorkspaceBarSettings(Visible: true, Height: 24, Position: "bottom"))
+            .ToWorkspaceBarOptions();
+
+        var reserved = options.Reserve(new WindowBounds(100, 200, 800, 600));
+
+        Assert.Equal(new WindowBounds(100, 200, 800, 576), reserved);
+        Assert.False(options.IsVertical);
+    }
+
+    [Fact]
+    public void ToWorkspaceBarOptions_InvalidPosition_Throws()
+    {
+        var settings = new RootlessWMSettings(0.55, 0, 0, WorkspaceBar: new WorkspaceBarSettings(Position: "diagonal"));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => settings.ToWorkspaceBarOptions());
+    }
+
+    [Fact]
+    public void ToWorkspaceBarOptions_ThicknessAlias_OverridesHeight()
+    {
+        var settings = new RootlessWMSettings(0.55, 0, 0, WorkspaceBar: new WorkspaceBarSettings(Height: 24, Thickness: 40));
+
+        var options = settings.ToWorkspaceBarOptions();
+
+        Assert.Equal(40, options.Height);
     }
 
     [Fact]

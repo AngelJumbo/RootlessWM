@@ -36,9 +36,15 @@ public sealed record RootlessWMSettings(
     public WorkspaceBarOptions ToWorkspaceBarOptions()
     {
         var bar = WorkspaceBar ?? WorkspaceBarSettings.Default;
-        if (bar.Height is < 16 or > 64)
+        var thickness = bar.Thickness ?? bar.Height;
+        if (thickness is < 16 or > 64)
         {
-            throw new ArgumentOutOfRangeException(nameof(WorkspaceBar), "The workspace bar height must be between 16 and 64.");
+            throw new ArgumentOutOfRangeException(nameof(WorkspaceBar), "The workspace bar height/thickness must be between 16 and 64.");
+        }
+
+        if (!Enum.TryParse<WorkspaceBarPosition>(bar.Position ?? "Top", true, out var position))
+        {
+            throw new ArgumentOutOfRangeException(nameof(WorkspaceBar), bar.Position, "The workspace bar position must be top, bottom, left, or right.");
         }
 
         var workspaces = bar.Workspaces ?? WorkspaceBarWorkspaceSettings.Default;
@@ -57,7 +63,7 @@ public sealed record RootlessWMSettings(
 
         return new WorkspaceBarOptions(
             bar.Visible,
-            bar.Height,
+            thickness,
             ParseColor(bar.Background, nameof(bar.Background)),
             new WorkspaceBarWorkspaceOptions(
                 ParseColor(workspaces.Background, nameof(workspaces.Background)),
@@ -78,7 +84,8 @@ public sealed record RootlessWMSettings(
             BuildSections(bar.Sections, style),
             bar.Modules is null ? null : BuildModules(bar.ModulesLeft),
             bar.Modules is null ? null : BuildModules(bar.ModulesCenter),
-            bar.Modules is null ? null : BuildModules(bar.ModulesRight));
+            bar.Modules is null ? null : BuildModules(bar.ModulesRight),
+            position);
     }
 
     private static WorkspaceBarModuleOptions BuildModuleOption(string id, WorkspaceBarModuleSettings module, WorkspaceBarStyleOptions barStyle)
@@ -317,6 +324,8 @@ public sealed record RootlessWMSettings(
 public sealed record WorkspaceBarSettings(
     bool Visible = true,
     int Height = 24,
+    int? Thickness = null,
+    string? Position = null,
     string Background = "#101010",
     WorkspaceBarWorkspaceSettings? Workspaces = null,
     WorkspaceBarLayoutSettings? Layout = null,

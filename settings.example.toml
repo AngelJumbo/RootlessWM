@@ -30,6 +30,7 @@ hide-explorer-on-start = false
 
 [statusbar]
 visible = true
+# position = "top"     # "top" (default), "bottom", "left", or "right"
 height = 28
 # Colors support #RRGGBB (opaque) and #RRGGBBAA (alpha). 00 is transparent; FF is opaque.
 background = "#1e1e2e"

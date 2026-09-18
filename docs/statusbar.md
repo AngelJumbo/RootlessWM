@@ -1,6 +1,6 @@
 # Status Bar
 
-RootlessWM includes an optional status bar displayed at the top of every monitor.
+RootlessWM includes an optional status bar displayed on an edge of every monitor.
 
 ## Configuration (`[statusbar]`)
 
@@ -9,7 +9,8 @@ Colors use `#RRGGBB` for opaque colors or `#RRGGBBAA` for colors with alpha (`00
 | Key | Type / Format | Description |
 | :--- | :--- | :--- |
 | `visible` | Boolean | Enables or disables the bar across all monitors. |
-| `height` | Integer (`16`–`64`) | Reserved height at the top of the tiling area. |
+| `position` | `"top"` \| `"bottom"` \| `"left"` \| `"right"` | Which monitor edge the bar docks to. Defaults to `top`. |
+| `height` | Integer (`16`–`64`) | Reserved thickness of the bar: its height when docked `top`/`bottom`, or its width when docked `left`/`right`. `thickness` is accepted as an alias for this key. |
 | `background` | Hex color | Base bar background. |
 | `border` | Table (`width`, `color`) | Border thickness and color. |
 | `radius` | Integer | Corner radius in pixels. |
@@ -33,6 +34,14 @@ format = "CPU {percent}%"
 ```
 
 Supported module types are `workspaces`, `layout`, `window-title`, `cpu`, `memory`, `clock`, `date`, `uptime`, `battery`, `disk`, `network`, `text`, and `command`.
+
+## Vertical bars (`position = "left"` or `"right"`)
+
+When the bar is docked to a side edge, modules and sections stack top-to-bottom instead of left-to-right, and `modules-left`/`modules-center`/`modules-right` (or a section's `left`/`center`/`right` alignment) map to top/middle/bottom placement along that column. Text is centered across the bar's thickness.
+
+The `window-title` module renders one character per line in vertical bars instead of ellipsizing horizontally. Its `max-width` style option is reused as a maximum character count (default `24`) before the title is truncated with `...`.
+
+Any module or widget text containing a literal newline (`\n`) is rendered as multiple stacked lines in both orientations.
 
 `monitor` defaults to `all`; `primary` shows only on the primary monitor and `focused` only on the focused monitor. Only `color` and `font` inherit from `[statusbar]`. Module `background`, `padding`, `margin`, `radius`, and `border` default independently to transparent, zero, zero, zero, and no border.
 
