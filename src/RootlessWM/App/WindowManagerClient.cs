@@ -28,6 +28,15 @@ internal sealed class WindowManagerClient
         _ = Send(new WindowManagerRequest(WindowManagerCommand.SetMouseFocusSuspended, Suspended: suspended));
     }
 
+    public void SetStatusBarVisibility(nint monitorHandle, int workspace, bool hidden)
+    {
+        _ = Send(new WindowManagerRequest(
+            WindowManagerCommand.SetStatusBarVisibility,
+            MonitorHandle: monitorHandle.ToInt64(),
+            Workspace: workspace,
+            StatusBarHidden: hidden));
+    }
+
     public WindowManagerStatus? GetStatus()
     {
         return Send(new WindowManagerRequest(WindowManagerCommand.GetStatus))?.Status;

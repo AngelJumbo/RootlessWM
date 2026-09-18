@@ -6,6 +6,7 @@ public enum WindowManagerCommand
 {
     ExecuteCommand,
     SetMouseFocusSuspended,
+    SetStatusBarVisibility,
     GetStatus,
     ReloadSettings,
     Shutdown
@@ -14,7 +15,10 @@ public enum WindowManagerCommand
 public sealed record WindowManagerRequest(
     WindowManagerCommand Command,
     TilingCommand? TilingCommand = null,
-    bool? Suspended = null);
+    bool? Suspended = null,
+    long? MonitorHandle = null,
+    int? Workspace = null,
+    bool? StatusBarHidden = null);
 
 public sealed record WindowManagerResponse(
     bool Success,

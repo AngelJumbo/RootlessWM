@@ -67,7 +67,7 @@ internal sealed class WorkspaceBarController : IDisposable
 
     // Toggles the bar for the given monitor's currently active workspace only, so the
     // hidden/shown state persists per monitor+workspace pair across workspace switches.
-    public void ToggleStatusBar(nint monitorHandle, int workspaceIndex)
+    public bool ToggleStatusBar(nint monitorHandle, int workspaceIndex)
     {
         if (!_hiddenWorkspaces.TryGetValue(monitorHandle, out var hidden))
         {
@@ -81,6 +81,7 @@ internal sealed class WorkspaceBarController : IDisposable
         }
 
         ApplyVisibility();
+        return hidden.Contains(workspaceIndex);
     }
 
     // Lets tiling know whether it should reserve space for this monitor+workspace's bar.

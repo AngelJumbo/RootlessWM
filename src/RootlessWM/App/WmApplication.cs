@@ -188,8 +188,9 @@ internal sealed class WmApplication
                     {
                         var status = client.GetStatus();
                         var workspace = status?.Monitors?.FirstOrDefault(m => m.MonitorHandle == monitorHandle.ToInt64())?.CurrentWorkspace ?? 0;
-                        workspaceBar.ToggleStatusBar(monitorHandle, workspace);
-                        _log.Info("status_bar_toggled", new { monitor = $"0x{monitorHandle.ToInt64():X}", workspace });
+                        var hidden = workspaceBar.ToggleStatusBar(monitorHandle, workspace);
+                        client.SetStatusBarVisibility(monitorHandle, workspace, hidden);
+                        _log.Info("status_bar_toggled", new { monitor = $"0x{monitorHandle.ToInt64():X}", workspace, hidden });
                     }
                     return;
                 }

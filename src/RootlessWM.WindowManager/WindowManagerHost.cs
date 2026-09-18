@@ -46,6 +46,7 @@ internal sealed class WindowManagerHost
     private MasterStackLayoutOptions _layoutOptions = MasterStackLayoutOptions.Default;
     private readonly LayoutState _layoutState = new();
     private readonly Dictionary<nint, int> _eligibilityRecheckAttempts = [];
+    private readonly Dictionary<(nint MonitorHandle, int Workspace), bool> _statusBarHidden = [];
     private readonly HashSet<nint> _workspaceHiddenHandles = [];
     private readonly HashSet<nint> _topmostHandles = [];
     private Action<nint>? _scheduleEligibilityRecheck;
@@ -380,6 +381,23 @@ internal sealed class WindowManagerHost
                     _mouseFocusSuspended = request.Suspended ?? false;
                     return new WindowManagerResponse(true);
 
+                case WindowManagerCommand.SetStatusBarVisibility:
+                    if (request.MonitorHandle is not long monitorValue
+                        || request.Workspace is not int workspace
+                        || request.StatusBarHidden is not bool hidden
+                        || monitorValue == 0)
+                    {
+                        return new WindowManagerResponse(false, "invalid_status_bar_visibility");
+                    }
+
+                    _statusBarHidden[(new nint(monitorValue), workspace)] = hidden;
+                    if (_managementState.IsEnabled)
+                    {
+                        RetilePrimaryWindows();
+                    }
+
+                    return new WindowManagerResponse(true, Status: BuildStatus());
+
                 case WindowManagerCommand.GetStatus:
                     return new WindowManagerResponse(true, Status: BuildStatus());
 
@@ -457,10 +475,14 @@ internal sealed class WindowManagerHost
             _log.Info("explorer_visibility_toggled", new { visible = explorerVisible, behaviour = _settings.ToggleExplorerBehaviour.ToString() });
             return;
         }
-
-        if (command is TilingCommand.OpenRunner or TilingCommand.ToggleStatusBar)
+        if (command == TilingCommand.ToggleStatusBar)
         {
-            // Handled locally by the normal-integrity process; never reaches the helper.
+            // Handled locally by the normal-integrity process, including visibility state sync.
+            return;
+        }
+
+        if (command is TilingCommand.OpenRunner)
+        {
             return;
         }
 
@@ -953,7 +975,10 @@ internal sealed class WindowManagerHost
                     workspace,
                     monitor.Handle,
                     _layoutOptions);
-                var workArea = workspaceBarOptions.ReserveTopSpace(monitor.Bounds);
+                var barVisible = workspaceBarOptions.Visible
+                    && !_statusBarHidden.GetValueOrDefault((monitor.Handle, workspace));
+                var workArea = (workspaceBarOptions with { Visible = barVisible })
+                    .ReserveTopSpace(monitor.Bounds);
                 if (!workArea.IsUsable)
                 {
                     continue;
