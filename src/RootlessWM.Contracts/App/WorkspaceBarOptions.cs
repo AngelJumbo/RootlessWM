@@ -89,7 +89,8 @@ public sealed record WorkspaceBarStyleOptions(
     WorkspaceBarSectionAlignment Alignment,
     int? MinWidth,
     int? MaxWidth,
-    bool Visible)
+    bool Visible,
+    int? MaxLength = null)
 {
     public static WorkspaceBarStyleOptions Default { get; } = new(
         Color.White,

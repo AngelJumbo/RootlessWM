@@ -59,7 +59,7 @@ symbols = { MasterLeft = "[]=", MasterTop = "TTT", monocle = "MON", floating = "
 [module.window-title]
 type = "window-title"
 monitor = "focused"
-max-width = 700
+max-length = 60
 color = "#a6adc8"
 
 [module.cpu]

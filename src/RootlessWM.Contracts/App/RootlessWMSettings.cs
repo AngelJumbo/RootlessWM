@@ -290,7 +290,8 @@ public sealed record RootlessWMSettings(
             style.Align is null ? fallback.Alignment : ParseAlignment(style.Align),
             style.MinWidth ?? fallback.MinWidth,
             style.MaxWidth ?? fallback.MaxWidth,
-            style.Visible ?? fallback.Visible);
+            style.Visible ?? fallback.Visible,
+            style.MaxLength ?? fallback.MaxLength);
     }
 
     private static WorkspaceBarSectionAlignment ParseAlignment(string value)
@@ -412,7 +413,8 @@ public sealed record WorkspaceBarStyleSettings(
     string? Align = null,
     int? MinWidth = null,
     int? MaxWidth = null,
-    bool? Visible = null);
+    bool? Visible = null,
+    int? MaxLength = null);
 
 public sealed record WorkspaceBarSectionSettings(
     string Id,

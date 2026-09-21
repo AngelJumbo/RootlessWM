@@ -712,7 +712,7 @@ internal sealed class WorkspaceBarController : IDisposable
                         }
                         else
                         {
-                            DrawText(canvas, _focusedWindowTitle, content, module.Style.Foreground, module.Style, alignment == WorkspaceBarSectionAlignment.Right ? SKTextAlign.Right : SKTextAlign.Left, ellipsis: true);
+                            DrawText(canvas, GetModuleText(module), content, module.Style.Foreground, module.Style, alignment == WorkspaceBarSectionAlignment.Right ? SKTextAlign.Right : SKTextAlign.Left, ellipsis: true);
                         }
                     }
                     break;
@@ -758,7 +758,7 @@ internal sealed class WorkspaceBarController : IDisposable
         {
             if (string.Equals(module.Type, "window-title", StringComparison.OrdinalIgnoreCase))
             {
-                return _isFocused ? _focusedWindowTitle : string.Empty;
+                return _isFocused ? TruncateTitle(_focusedWindowTitle, module.Style.MaxLength) : string.Empty;
             }
 
             if (!_moduleBindings.TryGetValue(module.Id, out var binding))
@@ -1087,10 +1087,20 @@ internal sealed class WorkspaceBarController : IDisposable
                 return StyledText.Empty;
             }
 
-            var maxChars = style.MaxWidth is int max && max > 0 ? max : 24;
-            var truncated = text.Length > maxChars ? text[..maxChars] : text;
+            var maxChars = style.MaxLength is int max && max > 0 ? max : 24;
+            var truncated = TruncateTitle(text, maxChars);
             var lines = truncated.Select(ch => (IReadOnlyList<StyledSpan>)new[] { new StyledSpan(ch.ToString()) }).ToList();
             return new StyledText(lines);
+        }
+
+        private static string TruncateTitle(string text, int? maxLength)
+        {
+            if (maxLength is not int max || max <= 0 || text.Length <= max)
+            {
+                return text;
+            }
+
+            return text[..max] + "...";
         }
 
         private static float MeasureLineWidth(IReadOnlyList<StyledSpan> line, Color defaultColor, WorkspaceBarStyleOptions style)

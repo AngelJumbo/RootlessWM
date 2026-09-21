@@ -86,6 +86,12 @@ internal static class NativeMethods
     internal const uint DwmwaWindowCornerPreference = 33;
     internal const uint MonitorDpiTypeEffective = 0;
 
+    internal static readonly nint DpiAwarenessContextPerMonitorAwareV2 = new(-4);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool SetProcessDpiAwarenessContext(nint dpiAwarenessContext);
+
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool AttachConsole(uint processId);

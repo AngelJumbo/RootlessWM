@@ -365,7 +365,8 @@ internal sealed class TomlSettingsProvider
             GetString(table, "Align") ?? "left",
             GetNullableLong(table, "MinWidth"),
             GetNullableLong(table, "MaxWidth"),
-            GetBool(table, "Visible"));
+            GetBool(table, "Visible"),
+            GetNullableLong(table, "MaxLength"));
     }
 
     private static IReadOnlyList<WorkspaceBarSectionSettings>? MapSections(TomlTable table)

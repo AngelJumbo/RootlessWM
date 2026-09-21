@@ -39,7 +39,7 @@ Supported module types are `workspaces`, `layout`, `window-title`, `cpu`, `memor
 
 When the bar is docked to a side edge, modules and sections stack top-to-bottom instead of left-to-right, and `modules-left`/`modules-center`/`modules-right` (or a section's `left`/`center`/`right` alignment) map to top/middle/bottom placement along that column. Text is centered across the bar's thickness.
 
-The `window-title` module renders one character per line in vertical bars instead of ellipsizing horizontally. Its `max-width` style option is reused as a maximum character count (default `24`) before the title is truncated with `...`.
+The `window-title` module renders one character per line in vertical bars instead of ellipsizing horizontally. Its `max-length` style option gives the maximum character count (default `24`) before the title is truncated with `...`; the same `max-length` also truncates the title in horizontal bars.
 
 Any module or widget text containing a literal newline (`\n`) is rendered as multiple stacked lines in both orientations.
 
@@ -51,7 +51,7 @@ Any module or widget text containing a literal newline (`\n`) is rendered as mul
 | :--- | :--- | :--- | :--- |
 | `workspaces` | No `format` | Labels from `labels`, or `1` through `9` | Active state uses `active-bg` and `active-fg`. |
 | `layout` | No `format` | Configured `symbols`, or built-in abbreviation | `MasterLeft`, `MasterTop`, `monocle`, `floating`. |
-| `window-title` | No `format` | Focused window title | `max-width` limits the title. |
+| `window-title` | No `format` | Focused window title | `max-length` limits the title (character count). |
 | `cpu` | Yes | `{percent}%` | `{percent}` |
 | `memory` | Yes | `{used_percent}%` | `{used_percent}` |
 | `clock` | Yes | `{:%H:%M:%S}` | Date/time syntax. |
