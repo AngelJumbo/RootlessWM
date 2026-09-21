@@ -77,6 +77,7 @@ internal sealed class RunnerController : IDisposable
         private List<RunnerItem> _items = [];
         private string _query = string.Empty;
         private int _selectedIndex;
+        private float _scale = 1F;
 
         public RunnerForm(RunnerSettings settings, ConsoleDiagnosticLog log)
         {
@@ -89,6 +90,26 @@ internal sealed class RunnerController : IDisposable
             TopMost = true;
             KeyPreview = true;
             DoubleBuffered = false;
+            DpiChanged += (_, _) =>
+            {
+                if (SetScale(DpiHelper.GetScale(this)) && Visible)
+                {
+                    Height = CalculateHeight(Screen.FromPoint(Cursor.Position).WorkingArea.Height);
+                    Redraw();
+                }
+            };
+        }
+
+        private bool SetScale(float scale)
+        {
+            if (scale == _scale)
+            {
+                return false;
+            }
+
+            _log.Info("runner_dpi_changed", new { oldScale = _scale, newScale = scale });
+            _scale = scale;
+            return true;
         }
 
         public void ApplySettings(RunnerSettings settings)
@@ -113,16 +134,23 @@ internal sealed class RunnerController : IDisposable
         public void ShowOnFocusedMonitor()
         {
             var monitor = Screen.FromPoint(Cursor.Position).WorkingArea;
-            var width = Math.Clamp(_settings.Window.Width, 320, monitor.Width);
+            _ = NativeMethods.GetCursorPos(out var cursorPosition);
+            _scale = DpiHelper.GetMonitorScale(NativeMethods.MonitorFromPoint(cursorPosition, NativeMethods.MonitorDefaultToNearest));
+            var width = Math.Clamp(
+                DpiHelper.LogicalToPixel(_settings.Window.Width, _scale),
+                DpiHelper.LogicalToPixel(320, _scale),
+                monitor.Width);
+            var offsetX = DpiHelper.LogicalToPixel(_settings.Window.OffsetX, _scale);
+            var offsetY = DpiHelper.LogicalToPixel(_settings.Window.OffsetY, _scale);
             Width = width;
             RefreshResults();
             Height = CalculateHeight(monitor.Height);
             Location = _settings.Window.Position.ToLowerInvariant() switch
             {
-                "top-left" => new Point(monitor.Left + _settings.Window.OffsetX, monitor.Top + _settings.Window.OffsetY),
-                "top-right" => new Point(monitor.Right - width - _settings.Window.OffsetX, monitor.Top + _settings.Window.OffsetY),
-                "center" => new Point(monitor.Left + (monitor.Width - width) / 2 + _settings.Window.OffsetX, monitor.Top + (monitor.Height - Height) / 2 + _settings.Window.OffsetY),
-                _ => new Point(monitor.Left + (monitor.Width - width) / 2 + _settings.Window.OffsetX, monitor.Top + _settings.Window.OffsetY)
+                "top-left" => new Point(monitor.Left + offsetX, monitor.Top + offsetY),
+                "top-right" => new Point(monitor.Right - width - offsetX, monitor.Top + offsetY),
+                "center" => new Point(monitor.Left + (monitor.Width - width) / 2 + offsetX, monitor.Top + (monitor.Height - Height) / 2 + offsetY),
+                _ => new Point(monitor.Left + (monitor.Width - width) / 2 + offsetX, monitor.Top + offsetY)
             };
             Show();
             Activate();
@@ -204,11 +232,18 @@ internal sealed class RunnerController : IDisposable
 
         private int CalculateHeight(int workAreaHeight)
         {
-            var inputHeight = Math.Max(32, _settings.Input.Height);
-            var rowHeight = Math.Max(28, _settings.Results.RowHeight);
+            // All settings values are logical; round the combined constants once so fractional
+            // scales don't accumulate per-term rounding errors.
+            var inputHeight = DpiHelper.LogicalToPixel(Math.Max(32, _settings.Input.Height), _scale);
+            var rowHeight = DpiHelper.LogicalToPixel(Math.Max(28, _settings.Results.RowHeight), _scale);
             var resultHeight = _items.Count * rowHeight;
-            var desired = 20 + inputHeight + 12 + resultHeight + 28;
-            return Math.Min(Math.Clamp(_settings.Window.MaxHeight, 160, workAreaHeight), desired);
+            var desired = DpiHelper.LogicalToPixel(20 + 12 + 28, _scale) + inputHeight + resultHeight;
+            return Math.Min(
+                Math.Clamp(
+                    DpiHelper.LogicalToPixel(_settings.Window.MaxHeight, _scale),
+                    DpiHelper.LogicalToPixel(160, _scale),
+                    workAreaHeight),
+                desired);
         }
 
         private void MoveSelection(int delta)
@@ -266,7 +301,10 @@ internal sealed class RunnerController : IDisposable
             {
                 var imageInfo = new SKImageInfo(bitmap.Width, bitmap.Height, SKColorType.Bgra8888, SKAlphaType.Premul);
                 using var surface = SKSurface.Create(imageInfo, bitmapData.Scan0, bitmapData.Stride);
-                Draw(surface.Canvas, bitmap.Width, bitmap.Height);
+                // Same model as the bar: physical bitmap, one canvas transform, logical drawing code.
+                var canvas = surface.Canvas;
+                canvas.Scale(_scale, _scale);
+                Draw(canvas, bitmap.Width / _scale, bitmap.Height / _scale);
                 surface.Flush();
             }
             finally
@@ -277,7 +315,7 @@ internal sealed class RunnerController : IDisposable
             UpdateLayer(bitmap);
         }
 
-        private void Draw(SKCanvas canvas, int width, int height)
+        private void Draw(SKCanvas canvas, float width, float height)
         {
             var style = _settings.Style;
             var results = _settings.Results;

@@ -84,6 +84,7 @@ internal static class NativeMethods
     internal const uint AttachParentProcess = 0xFFFFFFFF;
     internal const uint DwmwaCloaked = 14;
     internal const uint DwmwaWindowCornerPreference = 33;
+    internal const uint MonitorDpiTypeEffective = 0;
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -319,6 +320,13 @@ internal static class NativeMethods
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool GetMonitorInfo(nint monitor, ref MonitorInfo monitorInfo);
+
+    [DllImport("shcore.dll")]
+    internal static extern int GetDpiForMonitor(
+        nint monitor,
+        uint dpiType,
+        out uint dpiX,
+        out uint dpiY);
 
     [DllImport("user32.dll", SetLastError = true)]
     internal static extern nint SetWinEventHook(

@@ -21,6 +21,10 @@ internal sealed class WorkspaceBarController : IDisposable
     private WorkspaceBarOptions _options = WorkspaceBarOptionsDefaults.Create();
     private bool _configuredVisible;
     private bool _globallyVisible = true;
+    private IReadOnlyList<MonitorWorkArea>? _lastMonitors;
+    private Func<nint, int>? _lastGetWorkspace;
+    private Func<nint, MasterStackLayoutMode>? _lastGetLayout;
+    private bool _reapplyingForScaleChange;
 
     public WorkspaceBarController(int workspaceCount, Func<nint> getFocusedMonitorHandle, Func<string> getFocusedWindowTitle, ConsoleDiagnosticLog? log = null)
     {
@@ -113,6 +117,9 @@ internal sealed class WorkspaceBarController : IDisposable
         ArgumentNullException.ThrowIfNull(monitors);
         ArgumentNullException.ThrowIfNull(getCurrentWorkspace);
         ArgumentNullException.ThrowIfNull(getLayoutMode);
+        _lastMonitors = monitors;
+        _lastGetWorkspace = getCurrentWorkspace;
+        _lastGetLayout = getLayoutMode;
         var monitorHandles = monitors.Select(monitor => monitor.Handle).ToHashSet();
         foreach (var staleHandle in _bars.Keys.Where(handle => !monitorHandles.Contains(handle)).ToArray())
         {
@@ -125,6 +132,7 @@ internal sealed class WorkspaceBarController : IDisposable
             if (!_bars.TryGetValue(monitor.Handle, out var bar))
             {
                 bar = new WorkspaceBarView(_workspaceCount, _widgetRegistry, _log);
+                bar.ScaleChanged += HandleBarScaleChanged;
                 _bars.Add(monitor.Handle, bar);
             }
 
@@ -132,6 +140,7 @@ internal sealed class WorkspaceBarController : IDisposable
             bar.Update(
                 getCurrentWorkspace(monitor.Handle),
                 getLayoutMode(monitor.Handle),
+                monitor.Handle,
                 monitor.Bounds,
                 _options.Height,
                 _options.Position,
@@ -139,6 +148,26 @@ internal sealed class WorkspaceBarController : IDisposable
         }
 
         RefreshWidgets();
+    }
+
+    // A monitor DPI change invalidates the bar's physical bounds and bitmap; re-running the last
+    // Update recomputes both from the new scale without waiting for the next status refresh.
+    private void HandleBarScaleChanged(object? sender, EventArgs e)
+    {
+        if (_reapplyingForScaleChange || _lastMonitors is null || _lastGetWorkspace is null || _lastGetLayout is null)
+        {
+            return;
+        }
+
+        _reapplyingForScaleChange = true;
+        try
+        {
+            Update(_lastMonitors, _lastGetWorkspace, _lastGetLayout);
+        }
+        finally
+        {
+            _reapplyingForScaleChange = false;
+        }
     }
 
     private void RefreshWidgets()
@@ -210,6 +239,11 @@ internal sealed class WorkspaceBarController : IDisposable
         private bool _isPrimary;
         private bool _isVertical;
         private string _focusedWindowTitle = string.Empty;
+        private float _scale = 1F;
+
+        // Raised when the bar's monitor DPI changes so the controller can recompute the
+        // physical bounds and bitmap immediately instead of waiting for the next status refresh.
+        public event EventHandler? ScaleChanged;
 
         public WorkspaceBarView(int workspaceCount, WorkspaceBarWidgetRegistry widgetRegistry, ConsoleDiagnosticLog log)
         {
@@ -224,6 +258,25 @@ internal sealed class WorkspaceBarController : IDisposable
                 TopMost = true
             };
             WorkspaceCount = workspaceCount;
+            _form.DpiChanged += (_, _) =>
+            {
+                if (SetScale(DpiHelper.GetScale(_form)))
+                {
+                    ScaleChanged?.Invoke(this, EventArgs.Empty);
+                }
+            };
+        }
+
+        private bool SetScale(float scale)
+        {
+            if (scale == _scale)
+            {
+                return false;
+            }
+
+            _log.Info("workspace_bar_dpi_changed", new { oldScale = _scale, newScale = scale });
+            _scale = scale;
+            return true;
         }
 
         private int WorkspaceCount { get; }
@@ -311,17 +364,19 @@ internal sealed class WorkspaceBarController : IDisposable
         public void Update(
             int currentWorkspace,
             MasterStackLayoutMode layoutMode,
+            nint monitorHandle,
             WindowBounds workArea,
             int thickness,
             WorkspaceBarPosition position,
             bool isPrimary)
         {
+            SetScale(DpiHelper.GetMonitorScale(monitorHandle));
             var margin = new Padding(
-                Math.Max(0, _barStyle.Margin.Left),
-                Math.Max(0, _barStyle.Margin.Top),
-                Math.Max(0, _barStyle.Margin.Right),
-                Math.Max(0, _barStyle.Margin.Bottom));
-            var barThickness = Math.Max(1, thickness);
+                DpiHelper.LogicalToPixel(Math.Max(0, _barStyle.Margin.Left), _scale),
+                DpiHelper.LogicalToPixel(Math.Max(0, _barStyle.Margin.Top), _scale),
+                DpiHelper.LogicalToPixel(Math.Max(0, _barStyle.Margin.Right), _scale),
+                DpiHelper.LogicalToPixel(Math.Max(0, _barStyle.Margin.Bottom), _scale));
+            var barThickness = DpiHelper.LogicalToPixel(Math.Max(1, thickness), _scale);
             int left, top, width, barHeight;
             switch (position)
             {
@@ -427,7 +482,10 @@ internal sealed class WorkspaceBarController : IDisposable
                 using var surface = SKSurface.Create(imageInfo, bitmapData.Scan0, bitmapData.Stride);
                 var canvas = surface.Canvas;
                 canvas.Clear(SKColors.Transparent);
-                Draw(canvas, bitmap.Width, bitmap.Height);
+                // The bitmap is physical-resolution; one canvas transform maps the logical drawing
+                // coordinates used everywhere below onto it. Do not scale coordinates by hand.
+                canvas.Scale(_scale, _scale);
+                Draw(canvas, bitmap.Width / _scale, bitmap.Height / _scale);
                 surface.Flush();
             }
             finally
@@ -464,7 +522,7 @@ internal sealed class WorkspaceBarController : IDisposable
                 .Append((int)_layoutMode).Append('|')
                 .Append(_isFocused ? '1' : '0')
                 .Append(_isPrimary ? '1' : '0').Append('|')
-                .Append(_form.Width).Append('x').Append(_form.Height).Append('|');
+                .Append(_form.Width).Append('x').Append(_form.Height).Append('@').Append(_scale).Append('|');
 
             if (_options.ModulesLeft is not null || _options.ModulesCenter is not null || _options.ModulesRight is not null)
             {
@@ -534,7 +592,7 @@ internal sealed class WorkspaceBarController : IDisposable
             }
         }
 
-        private void Draw(SKCanvas canvas, int width, int height)
+        private void Draw(SKCanvas canvas, float width, float height)
         {
             var barRect = new SKRect(0, 0, width, height);
             DrawBox(canvas, barRect, _barStyle);
@@ -1094,6 +1152,7 @@ internal sealed class WorkspaceBarController : IDisposable
             var paint = new SKPaint
             {
                 IsAntialias = true,
+                SubpixelText = true,
                 Color = color,
                 TextSize = textSize,
                 Typeface = GetTypeface(fontFamily, weight, slant),
