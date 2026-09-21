@@ -188,6 +188,8 @@ internal sealed class TomlSettingsProvider
         return new WorkspaceBarSettings(
             GetBool(table, "Visible") ?? true,
             (int)(GetLong(table, "Height") ?? 24),
+            GetNullableLong(table, "Thickness"),
+            GetString(table, "Position"),
             GetString(table, "Background") ?? "#101010",
             MapWorkspaceBarWorkspaces(GetTable(table, "Workspaces")),
             MapWorkspaceBarLayout(GetTable(table, "Layout")),

@@ -26,6 +26,7 @@ public static class InlineStyleParser
             return StyledText.Plain(input);
         }
 
+        var lines = new List<IReadOnlyList<StyledSpan>>();
         var spans = new List<StyledSpan>();
         var buffer = new StringBuilder();
         var styleStack = new Stack<StyleState>();
@@ -49,6 +50,15 @@ public static class InlineStyleParser
         var i = 0;
         while (i < input.Length)
         {
+            if (input[i] == '\n')
+            {
+                Flush();
+                lines.Add(spans);
+                spans = [];
+                i++;
+                continue;
+            }
+
             if (input[i] == '[')
             {
                 // Check for escaped [[
@@ -99,8 +109,9 @@ public static class InlineStyleParser
         }
 
         Flush();
+        lines.Add(spans);
 
-        return spans.Count == 0 ? StyledText.Empty : new StyledText(spans);
+        return lines.Count == 1 && lines[0].Count == 0 ? StyledText.Empty : new StyledText(lines);
     }
 
     private static int FindTagEnd(string input, int start)

@@ -15,23 +15,56 @@ public sealed record WorkspaceBarOptions(
     IReadOnlyList<WorkspaceBarSectionOptions>? Sections = null,
     IReadOnlyList<WorkspaceBarModuleOptions>? ModulesLeft = null,
     IReadOnlyList<WorkspaceBarModuleOptions>? ModulesCenter = null,
-    IReadOnlyList<WorkspaceBarModuleOptions>? ModulesRight = null)
+    IReadOnlyList<WorkspaceBarModuleOptions>? ModulesRight = null,
+    WorkspaceBarPosition Position = WorkspaceBarPosition.Top)
 {
-    public WindowBounds ReserveTopSpace(WindowBounds workArea)
+    public bool IsVertical => Position is WorkspaceBarPosition.Left or WorkspaceBarPosition.Right;
+
+    public WindowBounds Reserve(WindowBounds workArea)
     {
-        var margin = Style?.Margin ?? Padding.Empty;
-        var reservedHeight = Height + margin.Top + margin.Bottom;
-        if (!Visible || reservedHeight >= workArea.Height)
+        if (!Visible)
         {
             return workArea;
         }
 
-        return new WindowBounds(
-            workArea.Left,
-            workArea.Top + reservedHeight,
-            workArea.Width,
-            workArea.Height - reservedHeight);
+        var margin = Style?.Margin ?? Padding.Empty;
+        return Position switch
+        {
+            WorkspaceBarPosition.Top => ReserveEdge(workArea, Height + margin.Top + margin.Bottom, fromStart: true, horizontal: false),
+            WorkspaceBarPosition.Bottom => ReserveEdge(workArea, Height + margin.Top + margin.Bottom, fromStart: false, horizontal: false),
+            WorkspaceBarPosition.Left => ReserveEdge(workArea, Height + margin.Left + margin.Right, fromStart: true, horizontal: true),
+            WorkspaceBarPosition.Right => ReserveEdge(workArea, Height + margin.Left + margin.Right, fromStart: false, horizontal: true),
+            _ => workArea
+        };
     }
+
+    private static WindowBounds ReserveEdge(WindowBounds workArea, int reserved, bool fromStart, bool horizontal)
+    {
+        var available = horizontal ? workArea.Width : workArea.Height;
+        if (reserved >= available)
+        {
+            return workArea;
+        }
+
+        if (horizontal)
+        {
+            return fromStart
+                ? new WindowBounds(workArea.Left + reserved, workArea.Top, workArea.Width - reserved, workArea.Height)
+                : new WindowBounds(workArea.Left, workArea.Top, workArea.Width - reserved, workArea.Height);
+        }
+
+        return fromStart
+            ? new WindowBounds(workArea.Left, workArea.Top + reserved, workArea.Width, workArea.Height - reserved)
+            : new WindowBounds(workArea.Left, workArea.Top, workArea.Width, workArea.Height - reserved);
+    }
+}
+
+public enum WorkspaceBarPosition
+{
+    Top,
+    Bottom,
+    Left,
+    Right
 }
 
 public enum WorkspaceBarSectionAlignment

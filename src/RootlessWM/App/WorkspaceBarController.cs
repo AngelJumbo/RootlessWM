@@ -134,6 +134,7 @@ internal sealed class WorkspaceBarController : IDisposable
                 getLayoutMode(monitor.Handle),
                 monitor.Bounds,
                 _options.Height,
+                _options.Position,
                 monitor.IsPrimary);
         }
 
@@ -207,6 +208,7 @@ internal sealed class WorkspaceBarController : IDisposable
         private MasterStackLayoutMode _layoutMode;
         private bool _isFocused;
         private bool _isPrimary;
+        private bool _isVertical;
         private string _focusedWindowTitle = string.Empty;
 
         public WorkspaceBarView(int workspaceCount, WorkspaceBarWidgetRegistry widgetRegistry, ConsoleDiagnosticLog log)
@@ -310,7 +312,8 @@ internal sealed class WorkspaceBarController : IDisposable
             int currentWorkspace,
             MasterStackLayoutMode layoutMode,
             WindowBounds workArea,
-            int height,
+            int thickness,
+            WorkspaceBarPosition position,
             bool isPrimary)
         {
             var margin = new Padding(
@@ -318,11 +321,37 @@ internal sealed class WorkspaceBarController : IDisposable
                 Math.Max(0, _barStyle.Margin.Top),
                 Math.Max(0, _barStyle.Margin.Right),
                 Math.Max(0, _barStyle.Margin.Bottom));
-            var left = workArea.Left + margin.Left;
-            var right = workArea.Left + workArea.Width - margin.Right;
-            var width = Math.Max(1, right - left);
-            var barHeight = Math.Max(1, height);
-            var top = workArea.Top + margin.Top;
+            var barThickness = Math.Max(1, thickness);
+            int left, top, width, barHeight;
+            switch (position)
+            {
+                case WorkspaceBarPosition.Left:
+                    left = workArea.Left + margin.Left;
+                    top = workArea.Top + margin.Top;
+                    width = barThickness;
+                    barHeight = Math.Max(1, workArea.Height - margin.Top - margin.Bottom);
+                    break;
+                case WorkspaceBarPosition.Right:
+                    width = barThickness;
+                    left = workArea.Left + workArea.Width - width - margin.Right;
+                    top = workArea.Top + margin.Top;
+                    barHeight = Math.Max(1, workArea.Height - margin.Top - margin.Bottom);
+                    break;
+                case WorkspaceBarPosition.Bottom:
+                    left = workArea.Left + margin.Left;
+                    width = Math.Max(1, workArea.Width - margin.Left - margin.Right);
+                    barHeight = barThickness;
+                    top = workArea.Top + workArea.Height - barHeight - margin.Bottom;
+                    break;
+                default:
+                    left = workArea.Left + margin.Left;
+                    width = Math.Max(1, workArea.Width - margin.Left - margin.Right);
+                    barHeight = barThickness;
+                    top = workArea.Top + margin.Top;
+                    break;
+            }
+
+            _isVertical = position is WorkspaceBarPosition.Left or WorkspaceBarPosition.Right;
             var bounds = new Rectangle(left, top, width, barHeight);
             if (bounds != _lastBounds)
             {
@@ -523,11 +552,22 @@ internal sealed class WorkspaceBarController : IDisposable
             DrawSections(canvas, content, _sectionsCenter, WorkspaceBarSectionAlignment.Center);
         }
 
+        private SKRect MakePrimaryRect(SKRect content, float start, float length)
+            => _isVertical
+                ? new SKRect(content.Left, start, content.Right, start + length)
+                : new SKRect(start, content.Top, start + length, content.Bottom);
+
+        private float PrimaryStart(SKRect rect) => _isVertical ? rect.Top : rect.Left;
+
+        private float PrimaryEnd(SKRect rect) => _isVertical ? rect.Bottom : rect.Right;
+
+        private float PrimarySize(SKRect rect) => _isVertical ? rect.Height : rect.Width;
+
         private void DrawModuleGroup(SKCanvas canvas, SKRect content, IReadOnlyList<WorkspaceBarModuleOptions> modules, WorkspaceBarSectionAlignment alignment)
         {
             _visibleModules.Clear();
             _moduleWidths.Clear();
-            var totalWidth = 0F;
+            var totalLength = 0F;
             foreach (var module in modules)
             {
                 if (!module.Style.Visible || !module.IsShownOn(_isPrimary, _isFocused))
@@ -535,52 +575,66 @@ internal sealed class WorkspaceBarController : IDisposable
                     continue;
                 }
 
-                var moduleWidth = MeasureModule(module);
+                var moduleLength = MeasureModule(module);
                 _visibleModules.Add(module);
-                _moduleWidths.Add(moduleWidth);
-                totalWidth += moduleWidth;
+                _moduleWidths.Add(moduleLength);
+                totalLength += moduleLength;
             }
 
-            totalWidth += Math.Max(0, _moduleWidths.Count - 1) * _barStyle.Spacing;
-            var x = alignment switch
+            totalLength += Math.Max(0, _moduleWidths.Count - 1) * _barStyle.Spacing;
+            var start = alignment switch
             {
-                WorkspaceBarSectionAlignment.Right => content.Right - totalWidth,
-                WorkspaceBarSectionAlignment.Center => content.Left + Math.Max(0, (content.Width - totalWidth) / 2F),
-                _ => content.Left
+                WorkspaceBarSectionAlignment.Right => PrimaryEnd(content) - totalLength,
+                WorkspaceBarSectionAlignment.Center => PrimaryStart(content) + Math.Max(0, (PrimarySize(content) - totalLength) / 2F),
+                _ => PrimaryStart(content)
             };
 
             for (var index = 0; index < _visibleModules.Count; index++)
             {
                 var module = _visibleModules[index];
-                var width = Math.Min(_moduleWidths[index], Math.Max(0, content.Right - x));
-                var rect = new SKRect(x, content.Top, x + width, content.Bottom);
+                var length = Math.Min(_moduleWidths[index], Math.Max(0, PrimaryEnd(content) - start));
+                var rect = MakePrimaryRect(content, start, length);
                 DrawModule(canvas, module, rect, alignment);
-                x += width + _barStyle.Spacing;
+                start += length + _barStyle.Spacing;
             }
         }
 
         private float MeasureModule(WorkspaceBarModuleOptions module)
         {
-            var text = string.Equals(module.Type, "layout", StringComparison.OrdinalIgnoreCase)
-                ? GetLayoutText(module)
-                : GetModuleText(module);
-            var width = module.Type.ToLowerInvariant() switch
+            float length;
+            if (string.Equals(module.Type, "workspaces", StringComparison.OrdinalIgnoreCase))
             {
-                "workspaces" => MeasureWorkspaces(module),
-                _ => MeasureText(text, module.Style)
-            };
-            width += module.Style.Padding.Left + module.Style.Padding.Right + module.Style.Margin.Left + module.Style.Margin.Right + module.Style.BorderWidth * 2;
-            if (module.Style.MinWidth is int minWidth)
+                length = MeasureWorkspaces(module);
+            }
+            else if (string.Equals(module.Type, "window-title", StringComparison.OrdinalIgnoreCase) && _isVertical)
             {
-                width = Math.Max(width, minWidth);
+                length = MeasureStyledTextHeight(VerticalizeWindowTitle(_isFocused ? _focusedWindowTitle : string.Empty, module.Style), module.Style);
+            }
+            else
+            {
+                var text = string.Equals(module.Type, "layout", StringComparison.OrdinalIgnoreCase)
+                    ? GetLayoutText(module)
+                    : GetModuleText(module);
+                length = _isVertical ? MeasureTextHeight(text, module.Style) : MeasureText(text, module.Style);
             }
 
-            return module.Style.MaxWidth is int maxWidth ? Math.Min(width, maxWidth) : width;
+            length += _isVertical
+                ? module.Style.Padding.Top + module.Style.Padding.Bottom + module.Style.Margin.Top + module.Style.Margin.Bottom
+                : module.Style.Padding.Left + module.Style.Padding.Right + module.Style.Margin.Left + module.Style.Margin.Right;
+            length += module.Style.BorderWidth * 2;
+            if (module.Style.MinWidth is int minWidth)
+            {
+                length = Math.Max(length, minWidth);
+            }
+
+            return module.Style.MaxWidth is int maxWidth ? Math.Min(length, maxWidth) : length;
         }
 
         private void DrawModule(SKCanvas canvas, WorkspaceBarModuleOptions module, SKRect rect, WorkspaceBarSectionAlignment alignment)
         {
-            var adjusted = new SKRect(rect.Left + module.Style.Margin.Left, rect.Top, rect.Right - module.Style.Margin.Right, rect.Bottom);
+            var adjusted = _isVertical
+                ? new SKRect(rect.Left, rect.Top + module.Style.Margin.Top, rect.Right, rect.Bottom - module.Style.Margin.Bottom)
+                : new SKRect(rect.Left + module.Style.Margin.Left, rect.Top, rect.Right - module.Style.Margin.Right, rect.Bottom);
             DrawBox(canvas, adjusted, module.Style);
             var content = Inset(adjusted, module.Style.Padding, module.Style.BorderWidth);
             switch (module.Type.ToLowerInvariant())
@@ -594,11 +648,18 @@ internal sealed class WorkspaceBarController : IDisposable
                 case "window-title":
                     if (_isFocused)
                     {
-                        DrawText(canvas, _focusedWindowTitle, content, module.Style.Foreground, module.Style, alignment == WorkspaceBarSectionAlignment.Right ? SKTextAlign.Right : SKTextAlign.Left, ellipsis: true);
+                        if (_isVertical)
+                        {
+                            DrawStyledText(canvas, VerticalizeWindowTitle(_focusedWindowTitle, module.Style), content, module.Style.Foreground, module.Style, SKTextAlign.Center);
+                        }
+                        else
+                        {
+                            DrawText(canvas, _focusedWindowTitle, content, module.Style.Foreground, module.Style, alignment == WorkspaceBarSectionAlignment.Right ? SKTextAlign.Right : SKTextAlign.Left, ellipsis: true);
+                        }
                     }
                     break;
                 default:
-                    DrawText(canvas, GetModuleText(module), content, module.Style.Foreground, module.Style, SKTextAlign.Left);
+                    DrawText(canvas, GetModuleText(module), content, module.Style.Foreground, module.Style, _isVertical ? SKTextAlign.Center : SKTextAlign.Left);
                     break;
             }
         }
@@ -606,16 +667,16 @@ internal sealed class WorkspaceBarController : IDisposable
         private void DrawWorkspaces(SKCanvas canvas, SKRect rect, WorkspaceBarModuleOptions module)
         {
             var labels = module.Labels ?? [];
-            var x = rect.Left;
+            var cursor = PrimaryStart(rect);
             for (var index = 0; index < WorkspaceCount; index++)
             {
                 var text = labels.Count > index ? labels[index] : (index + 1).ToString();
-                var textWidth = MeasureText(text, module.Style);
-                var itemRect = new SKRect(x, rect.Top, x + textWidth + 8, rect.Bottom);
+                var itemLength = (_isVertical ? LineHeight(module.Style) : MeasureText(text, module.Style)) + 8;
+                var itemRect = MakePrimaryRect(rect, cursor, itemLength);
                 var active = index == _currentWorkspace;
                 DrawFill(canvas, itemRect, active ? module.ActiveBackground ?? module.Style.Background : module.Style.Background, module.Style.BorderRadius);
                 DrawText(canvas, text, itemRect, active ? module.ActiveForeground ?? module.Style.Foreground : module.Style.Foreground, module.Style, SKTextAlign.Center);
-                x = itemRect.Right + 4;
+                cursor = PrimaryStart(itemRect) + itemLength + 4;
             }
         }
 
@@ -625,7 +686,8 @@ internal sealed class WorkspaceBarController : IDisposable
             var total = 0F;
             for (var index = 0; index < WorkspaceCount; index++)
             {
-                total += MeasureText(labels.Count > index ? labels[index] : (index + 1).ToString(), module.Style) + 12;
+                var text = labels.Count > index ? labels[index] : (index + 1).ToString();
+                total += (_isVertical ? LineHeight(module.Style) : MeasureText(text, module.Style)) + 12;
             }
 
             return total;
@@ -669,52 +731,68 @@ internal sealed class WorkspaceBarController : IDisposable
         private void DrawSections(SKCanvas canvas, SKRect content, IReadOnlyList<WorkspaceBarSectionOptions> sections, WorkspaceBarSectionAlignment alignment)
         {
             _sectionWidths.Clear();
-            var totalWidth = 0F;
+            var totalLength = 0F;
             foreach (var section in sections)
             {
-                var sectionWidth = MeasureSection(section);
-                _sectionWidths.Add(sectionWidth);
-                totalWidth += sectionWidth;
+                var sectionLength = MeasureSection(section);
+                _sectionWidths.Add(sectionLength);
+                totalLength += sectionLength;
             }
 
-            totalWidth += Math.Max(0, _sectionWidths.Count - 1) * _barStyle.Spacing;
-            var x = alignment switch
+            totalLength += Math.Max(0, _sectionWidths.Count - 1) * _barStyle.Spacing;
+            var start = alignment switch
             {
-                WorkspaceBarSectionAlignment.Right => content.Right - totalWidth,
-                WorkspaceBarSectionAlignment.Center => content.Left + Math.Max(0, (content.Width - totalWidth) / 2F),
-                _ => content.Left
+                WorkspaceBarSectionAlignment.Right => PrimaryEnd(content) - totalLength,
+                WorkspaceBarSectionAlignment.Center => PrimaryStart(content) + Math.Max(0, (PrimarySize(content) - totalLength) / 2F),
+                _ => PrimaryStart(content)
             };
 
             for (var index = 0; index < sections.Count; index++)
             {
-                var width = Math.Min(_sectionWidths[index], content.Width);
-                var rect = new SKRect(x, content.Top, x + width, content.Bottom);
+                var length = Math.Min(_sectionWidths[index], PrimarySize(content));
+                var rect = MakePrimaryRect(content, start, length);
                 DrawSection(canvas, sections[index], rect);
-                x += width + _barStyle.Spacing;
+                start += length + _barStyle.Spacing;
             }
         }
 
         private float MeasureSection(WorkspaceBarSectionOptions section)
         {
-            var contentWidth = section.Id.ToLowerInvariant() switch
+            float contentLength;
+            if (string.Equals(section.Id, "workspaces", StringComparison.OrdinalIgnoreCase))
             {
-                "workspaces" => MeasureWorkspaces(section.Style),
-                "layout" => MeasureText(GetLayoutText(), section.Style),
-                "title" => MeasureText(_focusedWindowTitle, section.Style),
-                _ => MeasureWidgets(section, section.Style)
-            };
-            var width = contentWidth + section.Style.Padding.Left + section.Style.Padding.Right + (section.Style.BorderWidth * 2);
+                contentLength = MeasureWorkspaces(section.Style);
+            }
+            else if (string.Equals(section.Id, "layout", StringComparison.OrdinalIgnoreCase))
+            {
+                contentLength = _isVertical ? MeasureTextHeight(GetLayoutText(), section.Style) : MeasureText(GetLayoutText(), section.Style);
+            }
+            else if (string.Equals(section.Id, "title", StringComparison.OrdinalIgnoreCase))
+            {
+                contentLength = _isVertical
+                    ? MeasureStyledTextHeight(VerticalizeWindowTitle(_focusedWindowTitle, section.Style), section.Style)
+                    : MeasureText(_focusedWindowTitle, section.Style);
+            }
+            else
+            {
+                contentLength = MeasureWidgets(section, section.Style);
+            }
+
+            var length = contentLength + (section.Style.BorderWidth * 2);
+            length += _isVertical
+                ? section.Style.Padding.Top + section.Style.Padding.Bottom
+                : section.Style.Padding.Left + section.Style.Padding.Right;
             if (section.Style.MinWidth is int minWidth)
             {
-                width = Math.Max(width, minWidth);
+                length = Math.Max(length, minWidth);
             }
 
             if (section.Style.MaxWidth is int maxWidth)
             {
-                width = Math.Min(width, maxWidth);
+                length = Math.Min(length, maxWidth);
             }
 
-            return width;
+            return length;
         }
 
         private void DrawSection(SKCanvas canvas, WorkspaceBarSectionOptions section, SKRect rect)
@@ -732,7 +810,14 @@ internal sealed class WorkspaceBarController : IDisposable
                 case "title":
                     if (_isFocused)
                     {
-                        DrawText(canvas, _focusedWindowTitle, content, _options.Title.CurrentForeground, section.Style, SKTextAlign.Center, ellipsis: true);
+                        if (_isVertical)
+                        {
+                            DrawStyledText(canvas, VerticalizeWindowTitle(_focusedWindowTitle, section.Style), content, _options.Title.CurrentForeground, section.Style, SKTextAlign.Center);
+                        }
+                        else
+                        {
+                            DrawText(canvas, _focusedWindowTitle, content, _options.Title.CurrentForeground, section.Style, SKTextAlign.Center, ellipsis: true);
+                        }
                     }
                     break;
                 default:
@@ -743,16 +828,16 @@ internal sealed class WorkspaceBarController : IDisposable
 
         private void DrawWorkspaces(SKCanvas canvas, SKRect rect, WorkspaceBarStyleOptions style)
         {
-            var x = rect.Left;
+            var cursor = PrimaryStart(rect);
             for (var index = 0; index < WorkspaceCount; index++)
             {
                 var text = _options.Workspaces.Symbols.Count > index ? _options.Workspaces.Symbols[index] : (index + 1).ToString();
-                var textWidth = MeasureText(text, style);
-                var itemRect = new SKRect(x, rect.Top, x + textWidth + 8, rect.Bottom);
+                var itemLength = (_isVertical ? LineHeight(style) : MeasureText(text, style)) + 8;
+                var itemRect = MakePrimaryRect(rect, cursor, itemLength);
                 var active = index == _currentWorkspace;
                 DrawFill(canvas, itemRect, active ? _options.Workspaces.CurrentBackground : _options.Workspaces.Background, 0);
                 DrawText(canvas, text, itemRect, active ? _options.Workspaces.CurrentForeground : _options.Workspaces.Foreground, style, SKTextAlign.Center);
-                x = itemRect.Right + 4;
+                cursor = PrimaryStart(itemRect) + itemLength + 4;
             }
         }
 
@@ -764,18 +849,18 @@ internal sealed class WorkspaceBarController : IDisposable
             }
 
             var widgets = GetSectionWidgets(section);
-            var widgetWidths = widgets.Select(widget => MeasureWidget(widget, sectionStyle)).ToList();
-            var x = section.Alignment == WorkspaceBarSectionAlignment.Right
-                ? rect.Right - widgetWidths.Sum() - Math.Max(0, widgetWidths.Count - 1) * _barStyle.Spacing
-                : rect.Left;
+            var widgetLengths = widgets.Select(widget => MeasureWidget(widget, sectionStyle)).ToList();
+            var start = section.Alignment == WorkspaceBarSectionAlignment.Right
+                ? PrimaryEnd(rect) - widgetLengths.Sum() - Math.Max(0, widgetLengths.Count - 1) * _barStyle.Spacing
+                : PrimaryStart(rect);
             for (var index = 0; index < widgets.Count; index++)
             {
                 var widget = widgets[index];
                 var style = widget.Style ?? sectionStyle;
                 var text = GetWidgetText(widget);
                 var symbolWidth = string.IsNullOrEmpty(widget.Symbol) ? 0 : MeasureText(widget.Symbol, style) + 6;
-                var width = widgetWidths[index];
-                var widgetRect = new SKRect(x, rect.Top, x + width, rect.Bottom);
+                var length = widgetLengths[index];
+                var widgetRect = MakePrimaryRect(rect, start, length);
                 DrawFill(canvas, widgetRect, widget.ResultBackground, style.BorderRadius);
                 var content = Inset(widgetRect, style.Padding, style.BorderWidth);
                 if (!string.IsNullOrEmpty(widget.Symbol))
@@ -784,7 +869,7 @@ internal sealed class WorkspaceBarController : IDisposable
                 }
 
                 DrawText(canvas, text, new SKRect(content.Left + symbolWidth, content.Top, content.Right, content.Bottom), widget.ResultForeground, style, SKTextAlign.Left);
-                x = widgetRect.Right + _barStyle.Spacing;
+                start += length + _barStyle.Spacing;
             }
         }
 
@@ -797,7 +882,8 @@ internal sealed class WorkspaceBarController : IDisposable
             var total = 0F;
             for (var index = 0; index < WorkspaceCount; index++)
             {
-                total += MeasureText(symbols.Count > index ? symbols[index] : (index + 1).ToString(), style) + 12;
+                var text = symbols.Count > index ? symbols[index] : (index + 1).ToString();
+                total += (_isVertical ? LineHeight(style) : MeasureText(text, style)) + 12;
             }
 
             return total;
@@ -818,6 +904,11 @@ internal sealed class WorkspaceBarController : IDisposable
         private float MeasureWidget(WorkspaceBarWidgetOptions widget, WorkspaceBarStyleOptions sectionStyle)
         {
             var style = widget.Style ?? sectionStyle;
+            if (_isVertical)
+            {
+                return LineHeight(style) + style.Padding.Top + style.Padding.Bottom + 6;
+            }
+
             var text = GetWidgetText(widget);
             return MeasureText(widget.Symbol, style) + MeasureText(text, style) + style.Padding.Left + style.Padding.Right + 6;
         }
@@ -865,30 +956,38 @@ internal sealed class WorkspaceBarController : IDisposable
             }
 
             var targetStyled = ellipsis ? Ellipsize(styled, rect.Width, style, defaultColor) : styled;
-            var totalWidth = MeasureStyledText(targetStyled, defaultColor, style);
+            var lineHeight = LineHeight(style);
+            var blockHeight = targetStyled.Lines.Count * lineHeight;
+            var blockTop = rect.MidY - (blockHeight / 2F);
 
-            var startX = align switch
+            for (var lineIndex = 0; lineIndex < targetStyled.Lines.Count; lineIndex++)
             {
-                SKTextAlign.Center => rect.MidX - (totalWidth / 2F),
-                SKTextAlign.Right => rect.Right - totalWidth,
-                _ => rect.Left
-            };
-
-            var currentX = startX;
-            foreach (var span in targetStyled.Spans)
-            {
-                if (string.IsNullOrEmpty(span.Text))
+                var line = targetStyled.Lines[lineIndex];
+                var lineWidth = MeasureLineWidth(line, defaultColor, style);
+                var startX = align switch
                 {
-                    continue;
+                    SKTextAlign.Center => rect.MidX - (lineWidth / 2F),
+                    SKTextAlign.Right => rect.Right - lineWidth,
+                    _ => rect.Left
+                };
+
+                var lineMidY = blockTop + (lineIndex * lineHeight) + (lineHeight / 2F);
+                var currentX = startX;
+                foreach (var span in line)
+                {
+                    if (string.IsNullOrEmpty(span.Text))
+                    {
+                        continue;
+                    }
+
+                    var paint = GetSpanPaint(span, defaultColor, style, SKTextAlign.Left);
+                    var spanWidth = paint.MeasureText(span.Text);
+                    var metrics = paint.FontMetrics;
+                    var y = lineMidY - ((metrics.Ascent + metrics.Descent) / 2F);
+
+                    canvas.DrawText(span.Text, currentX, y, paint);
+                    currentX += spanWidth;
                 }
-
-                var paint = GetSpanPaint(span, defaultColor, style, SKTextAlign.Left);
-                var spanWidth = paint.MeasureText(span.Text);
-                var metrics = paint.FontMetrics;
-                var y = rect.MidY - ((metrics.Ascent + metrics.Descent) / 2F);
-
-                canvas.DrawText(span.Text, currentX, y, paint);
-                currentX += spanWidth;
             }
         }
 
@@ -903,6 +1002,56 @@ internal sealed class WorkspaceBarController : IDisposable
             return MeasureStyledText(styled, style.Foreground, style);
         }
 
+        private static float MeasureTextHeight(string text, WorkspaceBarStyleOptions style)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return 0;
+            }
+
+            return MeasureStyledTextHeight(InlineStyleParser.Parse(text), style);
+        }
+
+        private static float MeasureStyledTextHeight(StyledText styled, WorkspaceBarStyleOptions style)
+            => styled.IsEmpty ? 0 : styled.Lines.Count * LineHeight(style);
+
+        private static float LineHeight(WorkspaceBarStyleOptions style)
+        {
+            var paint = GetSpanPaint(new StyledSpan(string.Empty), style.Foreground, style);
+            var metrics = paint.FontMetrics;
+            return metrics.Descent - metrics.Ascent;
+        }
+
+        private static StyledText VerticalizeWindowTitle(string text, WorkspaceBarStyleOptions style)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return StyledText.Empty;
+            }
+
+            var maxChars = style.MaxWidth is int max && max > 0 ? max : 24;
+            var truncated = text.Length > maxChars ? text[..maxChars] : text;
+            var lines = truncated.Select(ch => (IReadOnlyList<StyledSpan>)new[] { new StyledSpan(ch.ToString()) }).ToList();
+            return new StyledText(lines);
+        }
+
+        private static float MeasureLineWidth(IReadOnlyList<StyledSpan> line, Color defaultColor, WorkspaceBarStyleOptions style)
+        {
+            var width = 0F;
+            foreach (var span in line)
+            {
+                if (string.IsNullOrEmpty(span.Text))
+                {
+                    continue;
+                }
+
+                var paint = GetSpanPaint(span, defaultColor, style, SKTextAlign.Left);
+                width += paint.MeasureText(span.Text);
+            }
+
+            return width;
+        }
+
         private static float MeasureStyledText(StyledText styled, Color defaultColor, WorkspaceBarStyleOptions style)
         {
             if (styled.IsEmpty)
@@ -911,15 +1060,9 @@ internal sealed class WorkspaceBarController : IDisposable
             }
 
             var totalWidth = 0F;
-            foreach (var span in styled.Spans)
+            foreach (var line in styled.Lines)
             {
-                if (string.IsNullOrEmpty(span.Text))
-                {
-                    continue;
-                }
-
-                var paint = GetSpanPaint(span, defaultColor, style, SKTextAlign.Left);
-                totalWidth += paint.MeasureText(span.Text);
+                totalWidth = Math.Max(totalWidth, MeasureLineWidth(line, defaultColor, style));
             }
 
             return totalWidth;
@@ -975,25 +1118,28 @@ internal sealed class WorkspaceBarController : IDisposable
 
         private static StyledText Ellipsize(StyledText styled, float maxWidth, WorkspaceBarStyleOptions style, Color defaultColor)
         {
-            const string suffix = "...";
-            if (MeasureStyledText(styled, defaultColor, style) <= maxWidth)
-            {
-                return styled;
-            }
+            var lines = styled.Lines
+                .Select(line => MeasureLineWidth(line, defaultColor, style) <= maxWidth ? line : EllipsizeLine(line, maxWidth, style, defaultColor))
+                .ToList();
+            return new StyledText(lines);
+        }
 
-            if (styled.Spans.Count == 1)
+        private static IReadOnlyList<StyledSpan> EllipsizeLine(IReadOnlyList<StyledSpan> spans, float maxWidth, WorkspaceBarStyleOptions style, Color defaultColor)
+        {
+            const string suffix = "...";
+            if (spans.Count == 1)
             {
-                var singleSpan = styled.Spans[0];
+                var singleSpan = spans[0];
                 var paint = GetSpanPaint(singleSpan, defaultColor, style, SKTextAlign.Left);
-                return new StyledText([singleSpan with { Text = Ellipsize(singleSpan.Text, maxWidth, paint) }]);
+                return [singleSpan with { Text = Ellipsize(singleSpan.Text, maxWidth, paint) }];
             }
 
             var resultSpans = new List<StyledSpan>();
             var currentWidth = 0F;
 
-            for (var i = 0; i < styled.Spans.Count; i++)
+            for (var i = 0; i < spans.Count; i++)
             {
-                var span = styled.Spans[i];
+                var span = spans[i];
                 if (string.IsNullOrEmpty(span.Text))
                 {
                     continue;
@@ -1042,7 +1188,7 @@ internal sealed class WorkspaceBarController : IDisposable
                 }
             }
 
-            return resultSpans.Count == 0 ? StyledText.Empty : new StyledText(resultSpans);
+            return resultSpans;
         }
 
         private static string Ellipsize(string text, float maxWidth, SKPaint paint)

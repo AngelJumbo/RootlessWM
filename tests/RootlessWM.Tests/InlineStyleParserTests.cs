@@ -137,6 +137,29 @@ public sealed class InlineStyleParserTests
     }
 
     [Fact]
+    public void Parse_PlainTextWithNewline_ProducesTwoLines()
+    {
+        var result = InlineStyleParser.Parse("Line1\nLine2");
+
+        Assert.Equal(2, result.Lines.Count);
+        Assert.Equal("Line1", result.Lines[0][0].Text);
+        Assert.Equal("Line2", result.Lines[1][0].Text);
+        Assert.Equal("Line1\nLine2", result.PlainText);
+    }
+
+    [Fact]
+    public void Parse_StyledTextWithNewline_PreservesStyleAcrossLines()
+    {
+        var result = InlineStyleParser.Parse("[c=red]Red1\nRed2[/]");
+
+        Assert.Equal(2, result.Lines.Count);
+        Assert.Equal("Red1", result.Lines[0][0].Text);
+        Assert.Equal(Color.Red.ToArgb(), result.Lines[0][0].Foreground?.ToArgb());
+        Assert.Equal("Red2", result.Lines[1][0].Text);
+        Assert.Equal(Color.Red.ToArgb(), result.Lines[1][0].Foreground?.ToArgb());
+    }
+
+    [Fact]
     public void Parse_MultipleFormattedTagsInSequence_ParsesCorrectly()
     {
         var result = InlineStyleParser.Parse("[c=#f38ba8 f=\"Cascadia Code\" w=bold]CPU[/] [c=#a6e3a1 s=11]45%[/]");
