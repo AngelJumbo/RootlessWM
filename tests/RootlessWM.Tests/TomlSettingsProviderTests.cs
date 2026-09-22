@@ -270,6 +270,75 @@ public sealed class TomlSettingsProviderTests
     }
 
     [Fact]
+    public void Load_InvalidLayoutName_Throws()
+    {
+        var path = Path.Combine(CreateTempDir(), "settings.toml");
+        File.WriteAllText(path, "Layout = \"NotARealLayout\"");
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => new TomlSettingsProvider(path).Load());
+    }
+
+    [Fact]
+    public void Load_InvalidWorkspaceColor_Throws()
+    {
+        var path = Path.Combine(CreateTempDir(), "settings.toml");
+        File.WriteAllText(path, """
+            [StatusBar]
+            Background = "not-a-color"
+            """);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => new TomlSettingsProvider(path).Load());
+    }
+
+    [Fact]
+    public void Load_InvalidRunnerColor_Throws()
+    {
+        var path = Path.Combine(CreateTempDir(), "settings.toml");
+        File.WriteAllText(path, """
+            [runner.style]
+            background = "not-a-color"
+            """);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => new TomlSettingsProvider(path).Load());
+    }
+
+    [Fact]
+    public void Load_InvalidHotkeyBinding_Throws()
+    {
+        var path = Path.Combine(CreateTempDir(), "settings.toml");
+        File.WriteAllText(path, """
+            [Hotkeys]
+            PromoteToMaster = "justpressm"
+            """);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => new TomlSettingsProvider(path).Load());
+    }
+
+    [Fact]
+    public void Load_InvalidLaunchHotkey_Throws()
+    {
+        var path = Path.Combine(CreateTempDir(), "settings.toml");
+        File.WriteAllText(path, """
+            [[launch]]
+            hotkey = "NotAHotkey"
+            command = "pwsh.exe"
+            """);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => new TomlSettingsProvider(path).Load());
+    }
+
+    [Fact]
+    public void Load_InvalidToml_MessageIncludesFilePath()
+    {
+        var path = Path.Combine(CreateTempDir(), "settings.toml");
+        File.WriteAllText(path, "MasterRatio = = 0.6");
+
+        var exception = Assert.Throws<TomlException>(() => new TomlSettingsProvider(path).Load());
+
+        Assert.Contains(path, exception.Message);
+    }
+
+    [Fact]
     public void Load_SectionsNestedStyleAndCommandWidget()
     {
         var path = Path.Combine(CreateTempDir(), "settings.toml");

@@ -42,9 +42,9 @@ internal sealed class WindowManagerClient
         return Send(new WindowManagerRequest(WindowManagerCommand.GetStatus))?.Status;
     }
 
-    public WindowManagerStatus? ReloadSettings()
+    public WindowManagerResponse? ReloadSettings()
     {
-        return Send(new WindowManagerRequest(WindowManagerCommand.ReloadSettings))?.Status;
+        return Send(new WindowManagerRequest(WindowManagerCommand.ReloadSettings));
     }
 
     public void Shutdown()

@@ -30,7 +30,16 @@ internal sealed class TomlSettingsProvider
             return RootlessWMSettings.Default;
         }
 
-        var model = TomlSerializer.Deserialize<TomlTable>(File.ReadAllText(_filePath));
+        TomlTable? model;
+        try
+        {
+            model = TomlSerializer.Deserialize<TomlTable>(File.ReadAllText(_filePath));
+        }
+        catch (TomlException exception)
+        {
+            throw new TomlException($"{exception.Message} (file: {_filePath})");
+        }
+
         if (model is null)
         {
             return RootlessWMSettings.Default;
@@ -39,7 +48,40 @@ internal sealed class TomlSettingsProvider
         var settings = MapSettings(model);
         _ = settings.ToLayoutOptions();
         _ = settings.ToWorkspaceBarOptions();
+        settings.ValidateRunnerColors();
+        ValidateHotkeys(settings);
         return settings;
+    }
+
+    private static void ValidateHotkeys(RootlessWMSettings settings)
+    {
+        if (settings.Hotkeys is not null)
+        {
+            foreach (var (action, binding) in settings.Hotkeys)
+            {
+                if (!HotkeyBindingSyntax.IsValid(binding))
+                {
+                    throw new ArgumentOutOfRangeException(
+                        nameof(RootlessWMSettings.Hotkeys),
+                        binding,
+                        $"The hotkey binding for '{action}' is invalid. Expected a format like 'Alt+Shift+M'.");
+                }
+            }
+        }
+
+        if (settings.Launch is not null)
+        {
+            foreach (var launch in settings.Launch)
+            {
+                if (!HotkeyBindingSyntax.IsValid(launch.Hotkey))
+                {
+                    throw new ArgumentOutOfRangeException(
+                        nameof(RootlessWMSettings.Launch),
+                        launch.Hotkey,
+                        $"The launch hotkey '{launch.Hotkey}' is invalid. Expected a format like 'Alt+T'.");
+                }
+            }
+        }
     }
 
     private static RootlessWMSettings MapSettings(TomlTable table)

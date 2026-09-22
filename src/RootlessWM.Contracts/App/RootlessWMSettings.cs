@@ -33,6 +33,31 @@ public sealed record RootlessWMSettings(
         return options;
     }
 
+    internal void ValidateRunnerColors()
+    {
+        if (Runner is null)
+        {
+            return;
+        }
+
+        var style = Runner.Style ?? RunnerStyleSettings.Default;
+        ParseColor(style.Background, nameof(style.Background));
+        ParseColor(style.Color, nameof(style.Color));
+        ParseColor(style.BorderColor, nameof(style.BorderColor));
+
+        var input = Runner.Input ?? RunnerInputSettings.Default;
+        ParseColor(input.Background, nameof(input.Background));
+        ParseColor(input.Color, nameof(input.Color));
+        ParseColor(input.PlaceholderColor, nameof(input.PlaceholderColor));
+
+        var results = Runner.Results ?? RunnerResultsSettings.Default;
+        ParseColor(results.Background, nameof(results.Background));
+        ParseColor(results.Color, nameof(results.Color));
+        ParseColor(results.SelectedBackground, nameof(results.SelectedBackground));
+        ParseColor(results.SelectedColor, nameof(results.SelectedColor));
+        ParseColor(results.SecondaryColor, nameof(results.SecondaryColor));
+    }
+
     public WorkspaceBarOptions ToWorkspaceBarOptions()
     {
         var bar = WorkspaceBar ?? WorkspaceBarSettings.Default;

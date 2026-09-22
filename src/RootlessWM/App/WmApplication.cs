@@ -14,8 +14,9 @@ internal sealed class WmApplication
 
     private ConsoleDiagnosticLog _log = new();
     private readonly MonitorCatalog _monitorCatalog = new();
-    private readonly TomlSettingsProvider _settingsProvider = new();
+    private readonly SettingsLoader _settingsLoader = new(new TomlSettingsProvider());
     private RootlessWMSettings _settings = RootlessWMSettings.Default;
+    private string? _lastSettingsError;
     private WindowManagerClient? _windowManagerClient;
     private RunnerController? _runnerController;
     private WorkspaceBarController? _workspaceBar;
@@ -49,14 +50,14 @@ internal sealed class WmApplication
     {
         try
         {
-            Process.Start(new ProcessStartInfo(_settingsProvider.FilePath)
+            Process.Start(new ProcessStartInfo(_settingsLoader.FilePath)
             {
                 UseShellExecute = true
             });
         }
         catch (Win32Exception exception)
         {
-            _log.Error("settings_open_failed", new { path = _settingsProvider.FilePath, exception.Message });
+            _log.Error("settings_open_failed", new { path = _settingsLoader.FilePath, exception.Message });
         }
     }
 
@@ -120,15 +121,33 @@ internal sealed class WmApplication
 
             void ReloadSettingsAndHotkeys()
             {
-                LoadSettings();
+                var loaded = LoadSettings();
                 hotkeySource?.Dispose();
                 hotkeySource = new GlobalHotkeySource();
                 var unavailableCommands = hotkeySource.Start(_settings.Hotkeys, _settings.Launch);
                 workspaceBar.ApplyOptions(_settings.ToWorkspaceBarOptions());
                 runnerController.ApplySettings(_settings.Runner);
-                client.ReloadSettings();
+                var remoteResponse = client.ReloadSettings();
+                var remoteFailed = remoteResponse is { Success: false };
+
+                trayControllerRef?.SetHasConfigError(!loaded || remoteFailed);
+                if (!loaded)
+                {
+                    trayControllerRef?.ShowSettingsError($"Settings failed to load, keeping previous configuration: {_lastSettingsError}");
+                }
+                else if (remoteFailed)
+                {
+                    trayControllerRef?.ShowSettingsError($"Window manager rejected the settings reload: {remoteResponse!.Error}");
+                }
+                else if (unavailableCommands.Count > 0 || hotkeySource.UnavailableLaunchHotkeys.Count > 0)
+                {
+                    var details = string.Join(", ", unavailableCommands.Select(c => c.ToString()).Concat(hotkeySource.UnavailableLaunchHotkeys));
+                    trayControllerRef?.ShowSettingsError($"Some hotkeys could not be registered: {details}");
+                }
+
                 _log.Info("settings_reloaded", new
                 {
+                    success = loaded && !remoteFailed,
                     unavailableCommands = unavailableCommands.Select(c => c.ToString()).ToArray(),
                     unavailableLaunchHotkeys = hotkeySource.UnavailableLaunchHotkeys
                 });
@@ -347,22 +366,25 @@ internal sealed class WmApplication
         return buffer.ToString();
     }
 
-    private void LoadSettings()
+    private bool LoadSettings()
     {
-        try
+        var result = _settingsLoader.Load();
+        _settings = result.Settings;
+
+        if (result.Success)
         {
-            var settings = _settingsProvider.Load();
-            _settings = settings;
-            _log.Info("settings_loaded", new { settings.MasterRatio, settings.OuterGap, settings.InnerGap, settings.MasterCount });
+            _lastSettingsError = null;
+            _log.Info("settings_loaded", new { _settings.MasterRatio, _settings.OuterGap, _settings.InnerGap, _settings.MasterCount });
+            return true;
         }
-        catch (Exception exception) when (exception is IOException or System.Text.Json.JsonException or InvalidDataException or ArgumentOutOfRangeException or Tomlyn.TomlException)
+
+        _lastSettingsError = result.ErrorMessage;
+        _log.Error("settings_invalid", new
         {
-            _settings = RootlessWMSettings.Default;
-            _log.Error("settings_invalid", new
-            {
-                fallback = "defaults",
-                exception = exception.GetType().Name
-            });
-        }
+            path = result.FilePath,
+            fallback = result.UsedLastKnownGood ? "last-known-good" : "defaults",
+            error = result.ErrorMessage
+        });
+        return false;
     }
 }

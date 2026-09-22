@@ -7,6 +7,7 @@ internal sealed class TrayController : IDisposable
 {
     private readonly NotifyIcon _icon;
     private readonly ToolStripMenuItem _toggleItem;
+    private bool _hasConfigError;
 
     public TrayController(
         Action toggle,
@@ -52,7 +53,22 @@ internal sealed class TrayController : IDisposable
     public void SetStatus(string status)
     {
         ArgumentNullException.ThrowIfNull(status);
-        _icon.Text = status.Length <= 63 ? status : status[..63];
+        var text = _hasConfigError ? $"[Config error] {status}" : status;
+        _icon.Text = text.Length <= 63 ? text : text[..63];
+    }
+
+    public void SetHasConfigError(bool hasError)
+    {
+        _hasConfigError = hasError;
+    }
+
+    public void ShowSettingsError(string message)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        _icon.BalloonTipIcon = ToolTipIcon.Warning;
+        _icon.BalloonTipTitle = "RootlessWM settings error";
+        _icon.BalloonTipText = message.Length <= 255 ? message : message[..255];
+        _icon.ShowBalloonTip(8000);
     }
 
     public void Dispose()

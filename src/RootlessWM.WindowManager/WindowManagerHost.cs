@@ -42,7 +42,7 @@ internal sealed class WindowManagerHost
     private readonly IManagedWindowStateStore _windowStateStore = new JsonManagedWindowStateStore();
     private readonly JsonWorkspaceStateStore _workspaceStateStore = new();
     private readonly WindowRestorer _windowRestorer = new(new GuardedWindowBoundsRestorer());
-    private readonly TomlSettingsProvider _settingsProvider = new();
+    private readonly SettingsLoader _settingsLoader = new(new TomlSettingsProvider());
     private MasterStackLayoutOptions _layoutOptions = MasterStackLayoutOptions.Default;
     private readonly LayoutState _layoutState = new();
     private readonly Dictionary<nint, int> _eligibilityRecheckAttempts = [];
@@ -54,6 +54,7 @@ internal sealed class WindowManagerHost
     private bool _sessionLocked;
     private bool _mouseFocusSuspended;
     private Action? _requestShutdown;
+    private string? _lastSettingsError;
 
     public WindowManagerHost()
     {
@@ -402,12 +403,12 @@ internal sealed class WindowManagerHost
                     return new WindowManagerResponse(true, Status: BuildStatus());
 
                 case WindowManagerCommand.ReloadSettings:
-                    LoadSettings();
+                    var reloaded = LoadSettings();
                     if (_managementState.IsEnabled)
                     {
                         RetilePrimaryWindows();
                     }
-                    return new WindowManagerResponse(true, Status: BuildStatus());
+                    return new WindowManagerResponse(reloaded, reloaded ? null : _lastSettingsError, BuildStatus());
 
                 case WindowManagerCommand.Shutdown:
                     _requestShutdown?.Invoke();
@@ -1343,29 +1344,31 @@ internal sealed class WindowManagerHost
         return trackedWindows;
     }
 
-    private void LoadSettings()
+    private bool LoadSettings()
     {
-        try
+        var result = _settingsLoader.Load();
+        _settings = result.Settings;
+        _layoutOptions = _settings.ToLayoutOptions();
+        _eligibilityOptions.ExcludedExecutableNames.Clear();
+        foreach (var executable in _settings.ExcludedExecutables ?? [])
         {
-            var settings = _settingsProvider.Load();
-            _settings = settings;
-            _layoutOptions = settings.ToLayoutOptions();
-            _eligibilityOptions.ExcludedExecutableNames.Clear();
-            foreach (var executable in settings.ExcludedExecutables ?? [])
-            {
-                _eligibilityOptions.ExcludedExecutableNames.Add(executable);
-            }
-            _log.Info("settings_loaded", new { settings.MasterRatio, settings.OuterGap, settings.InnerGap, settings.MasterCount });
+            _eligibilityOptions.ExcludedExecutableNames.Add(executable);
         }
-        catch (Exception exception) when (exception is IOException or JsonException or InvalidDataException or ArgumentOutOfRangeException or Tomlyn.TomlException)
+
+        if (result.Success)
         {
-            _layoutOptions = MasterStackLayoutOptions.Default;
-            _settings = RootlessWMSettings.Default;
-            _log.Error("settings_invalid", new
-            {
-                fallback = "defaults",
-                exception = exception.GetType().Name
-            });
+            _lastSettingsError = null;
+            _log.Info("settings_loaded", new { _settings.MasterRatio, _settings.OuterGap, _settings.InnerGap, _settings.MasterCount });
+            return true;
         }
+
+        _lastSettingsError = result.ErrorMessage;
+        _log.Error("settings_invalid", new
+        {
+            path = result.FilePath,
+            fallback = result.UsedLastKnownGood ? "last-known-good" : "defaults",
+            error = result.ErrorMessage
+        });
+        return false;
     }
 }
