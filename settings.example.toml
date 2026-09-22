@@ -42,7 +42,7 @@ spacing = 6
 font = { family = "Cascadia Mono", size = 12, weight = "bold" }
 modules-left = ["workspaces", "layout"]
 modules-center = ["window-title"]
-modules-right = ["cpu", "memory", "clock"]
+modules-right = ["cpu", "memory", "datetime"]
 
 [module.workspaces]
 type = "workspaces"
@@ -81,14 +81,25 @@ monitor = "primary"
 format = "MEM {used_percent}%"
 color = "#fab387"
 
-[module.clock]
-type = "clock"
+[module.datetime]
+type = "datetime"
 monitor = "primary"
-format = "{:%H:%M:%S}"
+format = "{hours}:{minutes}:{seconds}"
 font = { family = "Cascadia Mono", size = 13, weight = "normal" }
 
+# datetime modules support {year}, {short_year}, {month}, {day}, {hours}, {minutes}, {seconds}.
+# A module's table name and its type are independent, so you can split time and date into two
+# separately styled modules sharing type = "datetime":
+# [module.clock]
+# type = "datetime"
+# format = "{hours}:{minutes}"
+#
+# [module.date]
+# type = "datetime"
+# format = "{day}-{month}-{year}"
+
 # Data modules support type-specific format placeholders documented in README.md.
-# Built-in data types: date, uptime, battery, disk, and network.
+# Built-in data types: datetime, uptime, battery, disk, and network.
 # Battery symbols can represent charge state and charging.
 # [module.battery]
 # type = "battery"

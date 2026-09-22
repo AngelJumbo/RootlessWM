@@ -20,9 +20,11 @@ public sealed class WorkspaceBarFormatTests
     }
 
     [Fact]
-    public void Format_ClockWithInlineStyles_ReplacesDateTimePlaceholders()
+    public void Format_DateTimeWithInlineStyles_ReplacesTokenPlaceholders()
     {
-        var formatted = WorkspaceBarFormat.Format("clock", "[c=#fab387 w=bold]{:%H:%M}[/]", new Dictionary<string, string>());
+        var values = new DateTimeWidgetProvider().GetValues();
+
+        var formatted = WorkspaceBarFormat.Format("datetime", "[c=#fab387 w=bold]{hours}:{minutes}[/]", values);
 
         var expectedTime = DateTime.Now.ToString("HH:mm");
         Assert.Equal($"[c=#fab387 w=bold]{expectedTime}[/]", formatted);

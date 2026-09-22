@@ -215,7 +215,7 @@ public sealed class RootlessWMSettingsTests
         var widgetSettings = new Dictionary<string, WorkspaceBarWidgetSettings>
         {
             ["cpu"] = new WorkspaceBarWidgetSettings(Symbol: "CPU", SymbolForeground: "#FF0000"),
-            ["clock"] = new WorkspaceBarWidgetSettings(Symbol: "TIME")
+            ["datetime"] = new WorkspaceBarWidgetSettings(Symbol: "TIME")
         };
         var settings = new RootlessWMSettings(
             0.55,
@@ -240,7 +240,7 @@ public sealed class RootlessWMSettingsTests
                     CurrentBackground: "#444444",
                     CurrentForeground: "#EEEEEE"),
                 Widgets: new WorkspaceBarWidgetsSettings(
-                    Order: ["clock", "cpu"],
+                    Order: ["datetime", "cpu"],
                     Widgets: widgetSettings)));
 
         var options = settings.ToWorkspaceBarOptions();
@@ -258,7 +258,7 @@ public sealed class RootlessWMSettingsTests
         Assert.Equal(ColorTranslator.FromHtml("#444444"), options.Title.CurrentBackground);
         Assert.Equal(ColorTranslator.FromHtml("#EEEEEE"), options.Title.CurrentForeground);
         Assert.Equal(2, options.Widgets.Count);
-        Assert.Equal("clock", options.Widgets[0].Kind);
+        Assert.Equal("datetime", options.Widgets[0].Kind);
         Assert.Equal("TIME", options.Widgets[0].Symbol);
         Assert.Equal("cpu", options.Widgets[1].Kind);
         Assert.Equal("CPU", options.Widgets[1].Symbol);
@@ -278,7 +278,7 @@ public sealed class RootlessWMSettingsTests
             0,
             WorkspaceBar: new WorkspaceBarSettings(
                 Widgets: new WorkspaceBarWidgetsSettings(
-                    Order: ["cpu", "memory", "clock"],
+                    Order: ["cpu", "memory", "datetime"],
                     Widgets: widgetSettings)));
 
         var options = settings.ToWorkspaceBarOptions();

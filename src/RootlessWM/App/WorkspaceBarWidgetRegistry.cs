@@ -22,8 +22,7 @@ internal sealed class WorkspaceBarWidgetRegistry
         [
             new CpuWidgetProvider(metricsSampler),
             new MemoryWidgetProvider(metricsSampler),
-            new ClockWidgetProvider(),
-            new DateWidgetProvider(),
+            new DateTimeWidgetProvider(),
             new UptimeWidgetProvider(),
             new BatteryWidgetProvider(new BatteryMetricsSampler()),
             new DiskWidgetProvider(),

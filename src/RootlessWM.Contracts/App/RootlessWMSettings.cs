@@ -144,8 +144,7 @@ public sealed record RootlessWMSettings(
         {
             "cpu" => "{percent}%",
             "memory" => "{used_percent}%",
-            "clock" => "{:%H:%M:%S}",
-            "date" => "{:%Y-%m-%d}",
+            "datetime" => "{hours}:{minutes}:{seconds}",
             "uptime" => "{days}d {hours}:{minutes}",
             "battery" => "{output}",
             "disk" => "{output}",
@@ -177,7 +176,7 @@ public sealed record RootlessWMSettings(
     private static IReadOnlyList<WorkspaceBarWidgetOptions> BuildWidgetOptions(WorkspaceBarWidgetsSettings widgets, WorkspaceBarStyleOptions barStyle)
     {
         var configured = widgets.Widgets ?? new Dictionary<string, WorkspaceBarWidgetSettings>(StringComparer.OrdinalIgnoreCase);
-        var order = widgets.Order ?? ["cpu", "memory", "clock"];
+        var order = widgets.Order ?? ["cpu", "memory", "datetime"];
         var options = new List<WorkspaceBarWidgetOptions>();
         foreach (var id in order)
         {

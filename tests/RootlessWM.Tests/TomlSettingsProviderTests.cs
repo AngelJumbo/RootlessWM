@@ -45,7 +45,7 @@ public sealed class TomlSettingsProviderTests
             CurrentForeground = "#EEEEEE"
 
             [StatusBar.Widgets]
-            Order = ["clock", "cpu"]
+            Order = ["datetime", "cpu"]
 
             [StatusBar.Widgets.Cpu]
             Symbol = "CPU"
@@ -77,7 +77,7 @@ public sealed class TomlSettingsProviderTests
         Assert.Equal("L", options.Layout.Symbols[MasterStackLayoutMode.MasterLeft]);
         Assert.Equal(ColorTranslator.FromHtml("#444444"), options.Title.CurrentBackground);
         Assert.Equal(2, options.Widgets.Count);
-        Assert.Equal("clock", options.Widgets[0].Kind);
+        Assert.Equal("datetime", options.Widgets[0].Kind);
         Assert.Equal("TIME", options.Widgets[0].Symbol);
         Assert.Equal("cpu", options.Widgets[1].Kind);
         Assert.Equal(ColorTranslator.FromHtml("#FF0000"), options.Widgets[1].SymbolForeground);

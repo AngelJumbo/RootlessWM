@@ -6,13 +6,13 @@ namespace RootlessWM.Tests;
 public sealed class WorkspaceBarWidgetRegistryTests
 {
     [Fact]
-    public void CreateDefault_ContainsCpuMemoryClock()
+    public void CreateDefault_ContainsCpuMemoryDateTime()
     {
         var registry = WorkspaceBarWidgetRegistry.CreateDefault();
 
         Assert.True(registry.TryGet("cpu", out _));
         Assert.True(registry.TryGet("memory", out _));
-        Assert.True(registry.TryGet("clock", out _));
+        Assert.True(registry.TryGet("datetime", out _));
     }
 
     [Fact]
@@ -20,7 +20,6 @@ public sealed class WorkspaceBarWidgetRegistryTests
     {
         var registry = WorkspaceBarWidgetRegistry.CreateDefault();
 
-        Assert.True(registry.TryGet("date", out _));
         Assert.True(registry.TryGet("uptime", out _));
         Assert.True(registry.TryGet("battery", out _));
         Assert.True(registry.TryGet("disk", out _));

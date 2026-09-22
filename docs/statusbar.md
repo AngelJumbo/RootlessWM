@@ -25,7 +25,7 @@ Use ordered module lists:
 ```toml
 modules-left = ["workspaces", "layout"]
 modules-center = ["window-title"]
-modules-right = ["cpu", "memory", "clock"]
+modules-right = ["cpu", "memory", "datetime"]
 
 [module.cpu]
 type = "cpu"
@@ -33,7 +33,27 @@ monitor = "primary"
 format = "CPU {percent}%"
 ```
 
-Supported module types are `workspaces`, `layout`, `window-title`, `cpu`, `memory`, `clock`, `date`, `uptime`, `battery`, `disk`, `network`, `text`, and `command`.
+Supported module types are `workspaces`, `layout`, `window-title`, `cpu`, `memory`, `datetime`, `uptime`, `battery`, `disk`, `network`, `text`, and `command`.
+
+A module's TOML table name (the `[module.<id>]` key) and its `type` are independent, so multiple
+modules can share the same `type` with different formats and styling. For example, to show the
+time and date as two separately styled modules:
+
+```toml
+modules-right = ["cpu", "memory", "clock", "date"]
+
+[module.clock]
+type = "datetime"
+monitor = "primary"
+format = "{hours}:{minutes}"
+font = { family = "Cascadia Mono", size = 13, weight = "normal" }
+
+[module.date]
+type = "datetime"
+monitor = "primary"
+format = "{day}-{month}-{year}"
+font = { family = "Cascadia Mono", size = 13, weight = "normal" }
+```
 
 ## Vertical bars (`position = "left"` or `"right"`)
 
@@ -54,8 +74,7 @@ Any module or widget text containing a literal newline (`\n`) is rendered as mul
 | `window-title` | No `format` | Focused window title | `max-length` limits the title (character count). |
 | `cpu` | Yes | `{percent}%` | `{percent}` |
 | `memory` | Yes | `{used_percent}%` | `{used_percent}` |
-| `clock` | Yes | `{:%H:%M:%S}` | Date/time syntax. |
-| `date` | Yes | `{:%Y-%m-%d}` | Date/time syntax. |
+| `datetime` | Yes | `{hours}:{minutes}:{seconds}` | `{year}`, `{short_year}`, `{month}`, `{day}`, `{hours}`, `{minutes}`, `{seconds}` |
 | `uptime` | Yes | `{days}d {hours}:{minutes}` | `{days}`, `{hours}`, `{minutes}`, `{seconds}`, `{total_seconds}` |
 | `battery` | Yes | `{percent}%{charging}` | `{percent}`, `{battery_symbol}`, `{charging}`, `{ac_status}`. Empty when no battery exists. |
 | `disk` | Yes | `{output}` | `{root}`, `{used_percent}`, `{used_bytes}`, `{free_bytes}`, `{total_bytes}`, `{output}` |

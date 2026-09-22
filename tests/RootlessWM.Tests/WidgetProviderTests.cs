@@ -6,9 +6,9 @@ namespace RootlessWM.Tests;
 public sealed class WidgetProviderTests
 {
     [Fact]
-    public void ClockWidgetProvider_GetText_ContainsTime()
+    public void DateTimeWidgetProvider_GetText_ContainsTime()
     {
-        var provider = new ClockWidgetProvider();
+        var provider = new DateTimeWidgetProvider();
 
         var text = provider.GetText();
 
@@ -16,13 +16,19 @@ public sealed class WidgetProviderTests
     }
 
     [Fact]
-    public void DateWidgetProvider_GetText_ContainsDate()
+    public void DateTimeWidgetProvider_GetValues_ContainsTokens()
     {
-        var provider = new DateWidgetProvider();
+        var provider = new DateTimeWidgetProvider();
+        var now = DateTime.Now;
 
-        var text = provider.GetText();
+        var values = provider.GetValues();
 
-        Assert.Contains(DateTime.Now.ToString("yyyy-MM-dd"), text);
+        Assert.Equal(now.ToString("yyyy"), values["year"]);
+        Assert.Equal(now.ToString("yy"), values["short_year"]);
+        Assert.Equal(now.ToString("MM"), values["month"]);
+        Assert.Equal(now.ToString("dd"), values["day"]);
+        Assert.Equal(now.ToString("HH"), values["hours"]);
+        Assert.Equal(now.ToString("mm"), values["minutes"]);
     }
 
     [Fact]
