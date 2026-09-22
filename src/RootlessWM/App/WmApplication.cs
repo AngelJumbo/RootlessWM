@@ -12,6 +12,13 @@ internal sealed class WmApplication
     private static readonly TimeSpan HelperConnectTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan HelperConnectPollInterval = TimeSpan.FromMilliseconds(200);
 
+    // The elevated helper is normally already on its way up via its own ONLOGON scheduled task,
+    // so give it a short grace period with a cheap per-attempt timeout before falling back to an
+    // explicit (and, in Release, blocking) `schtasks /Run`. This avoids paying that fallback cost
+    // and long pipe-connect timeouts on every ordinary logon, when the race is simply "not ready yet".
+    private static readonly TimeSpan HelperAutoStartGracePeriod = TimeSpan.FromSeconds(3);
+    private const int HelperProbeTimeoutMilliseconds = 150;
+
     private ConsoleDiagnosticLog _log = new();
     private readonly MonitorCatalog _monitorCatalog = new();
     private readonly SettingsLoader _settingsLoader = new(new TomlSettingsProvider());
@@ -35,11 +42,16 @@ internal sealed class WmApplication
         }
 
         _log.Info("application_started", new { mode = "foundation" });
-        LoadSettings();
 
         if (args.Contains("--manage", StringComparer.OrdinalIgnoreCase))
         {
+            // RunManageMode's own ReloadSettingsAndHotkeys() loads settings immediately, so
+            // loading them here too would parse settings.toml twice on every startup for no benefit.
             RunManageMode();
+        }
+        else
+        {
+            LoadSettings();
         }
 
         _log.Info("application_stopped", new { reason = "host_completed" });
@@ -64,7 +76,7 @@ internal sealed class WmApplication
     private void RunManageMode()
     {
         var client = new WindowManagerClient(_log);
-        if (client.GetStatus() is null && !StartWindowManagerHelper())
+        if (!WaitForHelper(client, HelperAutoStartGracePeriod) && !StartWindowManagerHelper())
         {
             _log.Error("management_blocked", new { reason = "helper_start_failed" });
             return;
@@ -73,7 +85,7 @@ internal sealed class WmApplication
         _windowManagerClient = client;
         try
         {
-            if (!WaitForHelper(client))
+            if (!WaitForHelper(client, HelperConnectTimeout))
             {
                 _log.Error("management_blocked", new { reason = "helper_unreachable" });
                 return;
@@ -316,20 +328,26 @@ internal sealed class WmApplication
     }
 #endif
 
-    private static bool WaitForHelper(WindowManagerClient client)
+    // Polls with a short per-attempt connect timeout so a helper that isn't listening yet is
+    // detected in ~HelperProbeTimeoutMilliseconds rather than blocking for the full pipe-connect
+    // timeout on every failed attempt.
+    private static bool WaitForHelper(WindowManagerClient client, TimeSpan timeout)
     {
-        var deadline = DateTime.UtcNow + HelperConnectTimeout;
-        while (DateTime.UtcNow < deadline)
+        var deadline = DateTime.UtcNow + timeout;
+        while (true)
         {
-            if (client.GetStatus() is not null)
+            if (client.GetStatus(HelperProbeTimeoutMilliseconds) is not null)
             {
                 return true;
             }
 
+            if (DateTime.UtcNow >= deadline)
+            {
+                return false;
+            }
+
             Thread.Sleep(HelperConnectPollInterval);
         }
-
-        return false;
     }
 
     private void ExecuteLaunch(LaunchHotkeySettings launch)

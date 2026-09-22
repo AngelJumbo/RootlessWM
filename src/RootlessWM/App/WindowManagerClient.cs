@@ -37,9 +37,9 @@ internal sealed class WindowManagerClient
             StatusBarHidden: hidden));
     }
 
-    public WindowManagerStatus? GetStatus()
+    public WindowManagerStatus? GetStatus(int? timeoutMilliseconds = null)
     {
-        return Send(new WindowManagerRequest(WindowManagerCommand.GetStatus))?.Status;
+        return Send(new WindowManagerRequest(WindowManagerCommand.GetStatus), timeoutMilliseconds)?.Status;
     }
 
     public WindowManagerResponse? ReloadSettings()
@@ -52,12 +52,12 @@ internal sealed class WindowManagerClient
         _ = Send(new WindowManagerRequest(WindowManagerCommand.Shutdown));
     }
 
-    private WindowManagerResponse? Send(WindowManagerRequest request)
+    private WindowManagerResponse? Send(WindowManagerRequest request, int? timeoutMilliseconds = null)
     {
         try
         {
             using var pipeClient = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
-            pipeClient.Connect(ConnectTimeoutMilliseconds);
+            pipeClient.Connect(timeoutMilliseconds ?? ConnectTimeoutMilliseconds);
             using var writer = new StreamWriter(pipeClient, leaveOpen: true) { AutoFlush = true };
             using var reader = new StreamReader(pipeClient, leaveOpen: true);
             writer.WriteLine(JsonSerializer.Serialize(request));
