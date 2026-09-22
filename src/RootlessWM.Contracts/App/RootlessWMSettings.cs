@@ -122,6 +122,11 @@ public sealed record RootlessWMSettings(
 
         var type = module.Type ?? id;
         var style = ParseModuleStyle(module.Style, barStyle);
+        if (string.Equals(type, "workspaces", StringComparison.OrdinalIgnoreCase) && module.Style?.Spacing is null)
+        {
+            style = style with { Spacing = 4 };
+        }
+
         return new WorkspaceBarModuleOptions(
             id,
             type,
@@ -136,7 +141,8 @@ public sealed record RootlessWMSettings(
             module.Symbol,
             module.ActiveBackground is null ? null : ParseColor(module.ActiveBackground, nameof(module.ActiveBackground)),
             module.ActiveForeground is null ? null : ParseColor(module.ActiveForeground, nameof(module.ActiveForeground)),
-            string.Equals(type, "battery", StringComparison.OrdinalIgnoreCase) ? module.Symbols : null);
+            string.Equals(type, "battery", StringComparison.OrdinalIgnoreCase) ? module.Symbols : null,
+            module.OnClick ?? DefaultModuleOnClick(type));
     }
 
     private static string? DefaultModuleFormat(string type)
@@ -152,6 +158,9 @@ public sealed record RootlessWMSettings(
             "command" => "{output}",
             _ => null
         };
+
+    private static string? DefaultModuleOnClick(string type)
+        => string.Equals(type, "workspaces", StringComparison.OrdinalIgnoreCase) ? "workspace" : null;
 
     private static IReadOnlyDictionary<MasterStackLayoutMode, string> ParseLayoutSymbols(
         IReadOnlyDictionary<string, string>? symbols)
@@ -458,6 +467,7 @@ public sealed record WorkspaceBarModuleSettings(
     string? Symbol = null,
     string? ActiveBackground = null,
     string? ActiveForeground = null,
+    string? OnClick = null,
     WorkspaceBarStyleSettings? Style = null);
 
 public sealed record RunnerSettings(

@@ -105,6 +105,8 @@ internal sealed class WmApplication
             UpdateStatus();
             _log.Info("management_started", new { hotkeyModifier = "Alt+Shift" });
 
+            workspaceBar.ActionInvoked += (action, index) => HandleBarActionInvoked(action, index);
+
             messageLoop.Run((messageId, hotkeyIdentifier) =>
             {
                 if (hotkeySource?.TryGetCommand(messageId, hotkeyIdentifier, out var command) == true)
@@ -217,6 +219,21 @@ internal sealed class WmApplication
                 var executed = client.ExecuteCommand(command);
                 UpdateStatus();
                 _log.Info("tiling_command_forwarded", new { command = command.ToString(), executed });
+            }
+
+            // Dispatch table for module `on-click` actions (see settings.example.toml). Keyed by
+            // action name so future modules can declare new actions without bar-specific code.
+            void HandleBarActionInvoked(string action, int index)
+            {
+                switch (action)
+                {
+                    case "workspace" when index is >= 0 and < 9:
+                        ExecuteTilingCommand(TilingCommand.SelectWorkspace1 + index);
+                        break;
+                    default:
+                        _log.Info("bar_action_ignored", new { action, index });
+                        break;
+                }
             }
         }
         finally

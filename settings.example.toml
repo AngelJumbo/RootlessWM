@@ -51,6 +51,11 @@ active-bg = "#cba6f7"
 active-fg = "#1e1e2e"
 background = "#313244"
 padding = { left = 4, right = 4 }
+# Spacing (in logical px) between the workspace labels. Defaults to 4.
+spacing = 4
+# Action run when a label is left-clicked. "workspace" switches to the clicked
+# workspace; this is the module's default even if omitted.
+on-click = "workspace"
 
 [module.layout]
 type = "layout"

@@ -26,6 +26,10 @@ internal sealed class WorkspaceBarController : IDisposable
     private Func<nint, MasterStackLayoutMode>? _lastGetLayout;
     private bool _reapplyingForScaleChange;
 
+    // Raised when a clickable module item (e.g. a workspace label) is clicked, carrying the
+    // module's configured action name (see `on-click` in settings) and the item index within it.
+    public event Action<string, int>? ActionInvoked;
+
     public WorkspaceBarController(int workspaceCount, Func<nint> getFocusedMonitorHandle, Func<string> getFocusedWindowTitle, ConsoleDiagnosticLog? log = null)
     {
         if (workspaceCount < 2)
@@ -133,6 +137,7 @@ internal sealed class WorkspaceBarController : IDisposable
             {
                 bar = new WorkspaceBarView(_workspaceCount, _widgetRegistry, _log);
                 bar.ScaleChanged += HandleBarScaleChanged;
+                bar.ItemClicked += (action, index) => ActionInvoked?.Invoke(action, index);
                 _bars.Add(monitor.Handle, bar);
             }
 
@@ -240,10 +245,15 @@ internal sealed class WorkspaceBarController : IDisposable
         private bool _isVertical;
         private string _focusedWindowTitle = string.Empty;
         private float _scale = 1F;
+        private readonly List<(SKRect Rect, string Action, int Index)> _clickTargets = [];
 
         // Raised when the bar's monitor DPI changes so the controller can recompute the
         // physical bounds and bitmap immediately instead of waiting for the next status refresh.
         public event EventHandler? ScaleChanged;
+
+        // Raised when a clickable region drawn during the last frame (e.g. a workspace label) is
+        // clicked, carrying the module's configured action name and the item index within it.
+        public event Action<string, int>? ItemClicked;
 
         public WorkspaceBarView(int workspaceCount, WorkspaceBarWidgetRegistry widgetRegistry, ConsoleDiagnosticLog log)
         {
@@ -265,6 +275,29 @@ internal sealed class WorkspaceBarController : IDisposable
                     ScaleChanged?.Invoke(this, EventArgs.Empty);
                 }
             };
+            _form.MouseDown += HandleMouseDown;
+        }
+
+        // Mouse coordinates arrive in physical pixels; the click targets recorded during Draw()
+        // are in logical (pre-DPI-scale) coordinates, matching the canvas.Scale(_scale, _scale)
+        // transform applied in Redraw(). Dividing by _scale keeps hit-testing correct across DPIs.
+        private void HandleMouseDown(object? sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Left || _clickTargets.Count == 0)
+            {
+                return;
+            }
+
+            var x = e.X / _scale;
+            var y = e.Y / _scale;
+            foreach (var target in _clickTargets)
+            {
+                if (target.Rect.Contains(x, y))
+                {
+                    ItemClicked?.Invoke(target.Action, target.Index);
+                    return;
+                }
+            }
         }
 
         private bool SetScale(float scale)
@@ -594,6 +627,7 @@ internal sealed class WorkspaceBarController : IDisposable
 
         private void Draw(SKCanvas canvas, float width, float height)
         {
+            _clickTargets.Clear();
             var barRect = new SKRect(0, 0, width, height);
             DrawBox(canvas, barRect, _barStyle);
             var content = Inset(barRect, _barStyle.Padding, _barStyle.BorderWidth);
@@ -725,6 +759,7 @@ internal sealed class WorkspaceBarController : IDisposable
         private void DrawWorkspaces(SKCanvas canvas, SKRect rect, WorkspaceBarModuleOptions module)
         {
             var labels = module.Labels ?? [];
+            var spacing = Math.Max(0, module.Style.Spacing);
             var cursor = PrimaryStart(rect);
             for (var index = 0; index < WorkspaceCount; index++)
             {
@@ -734,18 +769,24 @@ internal sealed class WorkspaceBarController : IDisposable
                 var active = index == _currentWorkspace;
                 DrawFill(canvas, itemRect, active ? module.ActiveBackground ?? module.Style.Background : module.Style.Background, module.Style.BorderRadius);
                 DrawText(canvas, text, itemRect, active ? module.ActiveForeground ?? module.Style.Foreground : module.Style.Foreground, module.Style, SKTextAlign.Center);
-                cursor = PrimaryStart(itemRect) + itemLength + 4;
+                if (!string.IsNullOrEmpty(module.OnClick))
+                {
+                    _clickTargets.Add((itemRect, module.OnClick, index));
+                }
+
+                cursor = PrimaryStart(itemRect) + itemLength + spacing;
             }
         }
 
         private float MeasureWorkspaces(WorkspaceBarModuleOptions module)
         {
             var labels = module.Labels ?? [];
+            var spacing = Math.Max(0, module.Style.Spacing);
             var total = 0F;
             for (var index = 0; index < WorkspaceCount; index++)
             {
                 var text = labels.Count > index ? labels[index] : (index + 1).ToString();
-                total += (_isVertical ? LineHeight(module.Style) : MeasureText(text, module.Style)) + 12;
+                total += (_isVertical ? LineHeight(module.Style) : MeasureText(text, module.Style)) + 8 + spacing;
             }
 
             return total;

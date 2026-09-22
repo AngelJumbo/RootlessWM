@@ -170,7 +170,8 @@ public sealed record WorkspaceBarModuleOptions(
     string? Symbol = null,
     Color? ActiveBackground = null,
     Color? ActiveForeground = null,
-    IReadOnlyDictionary<string, string>? BatterySymbols = null)
+    IReadOnlyDictionary<string, string>? BatterySymbols = null,
+    string? OnClick = null)
 {
     public bool IsShownOn(bool isPrimary, bool isFocused)
         => Monitor == WorkspaceBarModuleMonitor.All

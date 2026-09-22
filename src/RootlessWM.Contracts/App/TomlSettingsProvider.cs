@@ -277,6 +277,7 @@ internal sealed class TomlSettingsProvider
             GetString(table, "Symbol"),
             GetString(table, "ActiveBackground", "active-bg"),
             GetString(table, "ActiveForeground", "active-fg"),
+            GetString(table, "OnClick", "on-click"),
             MapStyle(table));
 
     private static WorkspaceBarWorkspaceSettings? MapWorkspaceBarWorkspaces(TomlTable? table)
