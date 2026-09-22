@@ -14,6 +14,7 @@ AppId={{B7A5A4B8-5EE6-4C02-AF0A-6D5B5E1D9C8F}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher={#AppPublisher}
+SetupIconFile=..\assets\RootlessWM.ico
 DefaultDirName={localappdata}\RootlessWM\app
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
@@ -94,7 +95,7 @@ begin
 
   { Configure power settings }
   PowerShellCommand :=
-    '-NoProfile -ExecutionPolicy Bypass -Command ' +
+    '-NoProfile -Command ' +
     '"$settings = New-ScheduledTaskSettingsSet ' +
     '-AllowStartIfOnBatteries ' +
     '-DontStopIfGoingOnBatteries ' +
