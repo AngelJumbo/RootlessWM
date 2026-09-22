@@ -9,19 +9,19 @@ public sealed class SettingsLoaderTests
     public void Load_ValidThenInvalid_KeepsLastKnownGood()
     {
         var path = Path.Combine(CreateTempDir(), "settings.toml");
-        File.WriteAllText(path, "MasterRatio = 0.6");
+        File.WriteAllText(path, "[Layouts]\nMasterRatio = 0.6");
         var loader = new SettingsLoader(new TomlSettingsProvider(path));
 
         var first = loader.Load();
         Assert.True(first.Success);
-        Assert.Equal(0.6, first.Settings.MasterRatio);
+        Assert.Equal(0.6, first.Settings.ToLayoutOptions().MasterRatio);
 
         File.WriteAllText(path, "MasterRatio = = 0.6");
         var second = loader.Load();
 
         Assert.False(second.Success);
         Assert.True(second.UsedLastKnownGood);
-        Assert.Equal(0.6, second.Settings.MasterRatio);
+        Assert.Equal(0.6, second.Settings.ToLayoutOptions().MasterRatio);
         Assert.Contains(path, second.ErrorMessage);
     }
 
@@ -43,14 +43,14 @@ public sealed class SettingsLoaderTests
     public void Load_ValidToml_Succeeds()
     {
         var path = Path.Combine(CreateTempDir(), "settings.toml");
-        File.WriteAllText(path, "MasterRatio = 0.7");
+        File.WriteAllText(path, "[Layouts]\nMasterRatio = 0.7");
         var loader = new SettingsLoader(new TomlSettingsProvider(path));
 
         var result = loader.Load();
 
         Assert.True(result.Success);
         Assert.Null(result.ErrorMessage);
-        Assert.Equal(0.7, result.Settings.MasterRatio);
+        Assert.Equal(0.7, result.Settings.ToLayoutOptions().MasterRatio);
     }
 
     private static string CreateTempDir()

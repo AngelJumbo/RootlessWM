@@ -45,6 +45,19 @@ internal sealed class WindowManagerHost
     private readonly SettingsLoader _settingsLoader = new(new TomlSettingsProvider());
     private MasterStackLayoutOptions _layoutOptions = MasterStackLayoutOptions.Default;
     private readonly LayoutState _layoutState = new();
+
+    private static readonly IReadOnlyDictionary<TilingCommand, MasterStackLayoutMode> DirectLayoutCommands =
+        new Dictionary<TilingCommand, MasterStackLayoutMode>
+        {
+            [TilingCommand.SelectLayoutMasterLeft] = MasterStackLayoutMode.MasterLeft,
+            [TilingCommand.SelectLayoutMasterTop] = MasterStackLayoutMode.MasterTop,
+            [TilingCommand.SelectLayoutMonocle] = MasterStackLayoutMode.Monocle,
+            [TilingCommand.SelectLayoutFloating] = MasterStackLayoutMode.Floating,
+            [TilingCommand.SelectLayoutGrid] = MasterStackLayoutMode.Grid,
+            [TilingCommand.SelectLayoutFibonacci] = MasterStackLayoutMode.Fibonacci,
+            [TilingCommand.SelectLayoutDwindle] = MasterStackLayoutMode.Dwindle,
+            [TilingCommand.SelectLayoutCenteredMaster] = MasterStackLayoutMode.CenteredMaster
+        };
     private readonly Dictionary<nint, int> _eligibilityRecheckAttempts = [];
     private readonly Dictionary<(nint MonitorHandle, int Workspace), bool> _statusBarHidden = [];
     private readonly HashSet<nint> _workspaceHiddenHandles = [];
@@ -605,7 +618,7 @@ internal sealed class WindowManagerHost
             return;
         }
 
-        if (command == TilingCommand.CycleLayout)
+        if (command is TilingCommand.CycleLayout or TilingCommand.CycleLayoutPrevious)
         {
             var monitorHandle = GetActiveMonitorHandle(activeHandle);
             if (monitorHandle == nint.Zero)
@@ -614,9 +627,33 @@ internal sealed class WindowManagerHost
             }
 
             var workspace = _workspaceState.GetCurrentWorkspace(monitorHandle);
-            var layout = _layoutState.Cycle(workspace, monitorHandle, _layoutOptions);
+            var enabledOrder = _settings.ToLayoutCycleOrder();
+            var layout = command == TilingCommand.CycleLayout
+                ? _layoutState.Cycle(workspace, monitorHandle, _layoutOptions, enabledOrder)
+                : _layoutState.CyclePrevious(workspace, monitorHandle, _layoutOptions, enabledOrder);
             RetilePrimaryWindows();
             _log.Info("layout_cycled", new
+            {
+                workspace,
+                monitor = $"0x{monitorHandle.ToInt64():X}",
+                layout = layout.Mode.ToString(),
+                direction = command.ToString()
+            });
+            return;
+        }
+
+        if (DirectLayoutCommands.TryGetValue(command, out var selectedLayoutMode))
+        {
+            var monitorHandle = GetActiveMonitorHandle(activeHandle);
+            if (monitorHandle == nint.Zero)
+            {
+                return;
+            }
+
+            var workspace = _workspaceState.GetCurrentWorkspace(monitorHandle);
+            var layout = _layoutState.SetMode(workspace, monitorHandle, _layoutOptions, selectedLayoutMode);
+            RetilePrimaryWindows();
+            _log.Info("layout_selected", new
             {
                 workspace,
                 monitor = $"0x{monitorHandle.ToInt64():X}",
@@ -1358,7 +1395,7 @@ internal sealed class WindowManagerHost
         if (result.Success)
         {
             _lastSettingsError = null;
-            _log.Info("settings_loaded", new { _settings.MasterRatio, _settings.OuterGap, _settings.InnerGap, _settings.MasterCount });
+            _log.Info("settings_loaded", new { _layoutOptions.MasterRatio, _layoutOptions.OuterGap, _layoutOptions.InnerGap, _layoutOptions.MasterCount });
             return true;
         }
 

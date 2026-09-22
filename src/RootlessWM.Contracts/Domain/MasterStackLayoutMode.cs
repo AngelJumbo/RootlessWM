@@ -5,5 +5,9 @@ public enum MasterStackLayoutMode
     MasterLeft,
     MasterTop,
     Monocle,
-    Floating
+    Floating,
+    Grid,
+    Fibonacci,
+    Dwindle,
+    CenteredMaster
 }

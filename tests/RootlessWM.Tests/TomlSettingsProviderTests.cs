@@ -14,10 +14,12 @@ public sealed class TomlSettingsProviderTests
         var dir = CreateTempDir();
         var path = Path.Combine(dir, "settings.toml");
         File.WriteAllText(path, """
-            MasterRatio = 0.6
             OuterGap = 8
             InnerGap = 8
-            Layout = "MasterTop"
+
+            [Layouts]
+            MasterRatio = 0.6
+            Default = "MasterTop"
             MasterCount = 3
 
             [StatusBar]
@@ -61,10 +63,11 @@ public sealed class TomlSettingsProviderTests
 
         var settings = new TomlSettingsProvider(path).Load();
 
-        Assert.Equal(0.6, settings.MasterRatio);
+        var layoutOptions = settings.ToLayoutOptions();
+        Assert.Equal(0.6, layoutOptions.MasterRatio);
         Assert.Equal(8, settings.OuterGap);
         Assert.Equal(8, settings.InnerGap);
-        Assert.Equal(3, settings.MasterCount);
+        Assert.Equal(3, layoutOptions.MasterCount);
         Assert.Equal("Alt+Shift+M", settings.Hotkeys!["PromoteToMaster"]);
         Assert.Equal("Alt+Ctrl+J", settings.Hotkeys!["FocusNext"]);
 
@@ -273,7 +276,7 @@ public sealed class TomlSettingsProviderTests
     public void Load_InvalidLayoutName_Throws()
     {
         var path = Path.Combine(CreateTempDir(), "settings.toml");
-        File.WriteAllText(path, "Layout = \"NotARealLayout\"");
+        File.WriteAllText(path, "[Layouts]\nDefault = \"NotARealLayout\"");
 
         Assert.Throws<ArgumentOutOfRangeException>(() => new TomlSettingsProvider(path).Load());
     }

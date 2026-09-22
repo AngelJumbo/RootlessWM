@@ -12,7 +12,7 @@ public sealed class RootlessWMSettingsTests
     [Fact]
     public void ToLayoutOptions_ValidSettings_ReturnsConfiguredValues()
     {
-        var settings = new RootlessWMSettings(0.6, 8, 8);
+        var settings = new RootlessWMSettings(8, 8, Layouts: new LayoutsSettings(MasterRatio: 0.6));
 
         var options = settings.ToLayoutOptions();
 
@@ -25,7 +25,7 @@ public sealed class RootlessWMSettingsTests
     [Fact]
     public void ToLayoutOptions_ConfiguredMasterCount_ReturnsConfiguredValue()
     {
-        var options = new RootlessWMSettings(0.6, 8, 8, MasterCount: 3).ToLayoutOptions();
+        var options = new RootlessWMSettings(8, 8, Layouts: new LayoutsSettings(MasterCount: 3)).ToLayoutOptions();
 
         Assert.Equal(3, options.MasterCount);
     }
@@ -33,7 +33,7 @@ public sealed class RootlessWMSettingsTests
     [Fact]
     public void ToLayoutOptions_InvalidMasterCount_Throws()
     {
-        var settings = new RootlessWMSettings(0.6, 8, 8, MasterCount: 0);
+        var settings = new RootlessWMSettings(8, 8, Layouts: new LayoutsSettings(MasterCount: 0));
 
         Assert.Throws<ArgumentOutOfRangeException>(() => settings.ToLayoutOptions());
     }
@@ -41,7 +41,7 @@ public sealed class RootlessWMSettingsTests
     [Fact]
     public void ToLayoutOptions_InvalidSettings_Throws()
     {
-        var settings = new RootlessWMSettings(1, -1, 0);
+        var settings = new RootlessWMSettings(-1, 0);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => settings.ToLayoutOptions());
     }
@@ -49,7 +49,7 @@ public sealed class RootlessWMSettingsTests
     [Fact]
     public void ToLayoutOptions_InvalidInnerGap_Throws()
     {
-        var settings = new RootlessWMSettings(0.6, 0, -1);
+        var settings = new RootlessWMSettings(0, -1);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => settings.ToLayoutOptions());
     }
@@ -63,7 +63,7 @@ public sealed class RootlessWMSettingsTests
             ["FocusNext"] = "Alt+Ctrl+J"
         };
 
-        var settings = new RootlessWMSettings(0.55, 0, 0, hotkeys);
+        var settings = new RootlessWMSettings(0, 0, hotkeys);
 
         Assert.Equal("Alt+Shift+M", settings.Hotkeys!["PromoteToMaster"]);
         Assert.Equal("Alt+Ctrl+J", settings.Hotkeys!["FocusNext"]);
@@ -73,7 +73,6 @@ public sealed class RootlessWMSettingsTests
     public void Constructor_Runner_PreservesConfiguredValues()
     {
         var settings = new RootlessWMSettings(
-            0.55,
             0,
             0,
             Runner: new RunnerSettings(
@@ -100,7 +99,6 @@ public sealed class RootlessWMSettingsTests
         };
 
         var settings = new RootlessWMSettings(
-            0.55,
             0,
             0,
             Launch: launchEntries);
@@ -162,7 +160,6 @@ public sealed class RootlessWMSettingsTests
     public void Constructor_ToggleExplorerBehaviour_PreservesConfiguredValue()
     {
         var settings = new RootlessWMSettings(
-            0.55,
             0,
             0,
             ToggleExplorerBehaviour: ToggleExplorerBehaviour.TaskbarAndDesktopIcons);
@@ -185,7 +182,7 @@ public sealed class RootlessWMSettingsTests
     [Fact]
     public void Constructor_HideExplorerOnStart_PreservesConfiguredValue()
     {
-        var settings = new RootlessWMSettings(0.55, 0, 0, HideExplorerOnStart: true);
+        var settings = new RootlessWMSettings(0, 0, HideExplorerOnStart: true);
 
         Assert.True(settings.HideExplorerOnStart);
     }
@@ -193,20 +190,49 @@ public sealed class RootlessWMSettingsTests
     [Fact]
     public void ToLayoutOptions_MasterTop_ParsesConfiguredMode()
     {
-        var options = new RootlessWMSettings(0.5, 8, 8, Layout: "MasterTop").ToLayoutOptions();
+        var options = new RootlessWMSettings(8, 8, Layouts: new LayoutsSettings(Default: "MasterTop")).ToLayoutOptions();
 
         Assert.Equal(RootlessWM.Domain.MasterStackLayoutMode.MasterTop, options.Mode);
     }
 
     [Fact]
-    public void CycleMode_AdvancesThroughMasterLeftMasterTopMonocleAndFloating()
+    public void ToLayoutCycleOrder_Empty_ReturnsDefaultOrder()
     {
-        var options = new MasterStackLayoutOptions(0.5, 8, 8);
+        var settings = new RootlessWMSettings(8, 8);
 
-        Assert.Equal(MasterStackLayoutMode.MasterTop, options.CycleMode().Mode);
-        Assert.Equal(MasterStackLayoutMode.Monocle, options.CycleMode().CycleMode().Mode);
-        Assert.Equal(MasterStackLayoutMode.Floating, options.CycleMode().CycleMode().CycleMode().Mode);
-        Assert.Equal(MasterStackLayoutMode.MasterLeft, options.CycleMode().CycleMode().CycleMode().CycleMode().Mode);
+        Assert.Equal(LayoutCatalog.DefaultCycleOrder, settings.ToLayoutCycleOrder());
+    }
+
+    [Fact]
+    public void ToLayoutCycleOrder_ValidList_ParsesInOrder()
+    {
+        var settings = new RootlessWMSettings(8, 8, Layouts: new LayoutsSettings(["MasterLeft", "Grid", "Dwindle", "CenteredMaster"]));
+
+        Assert.Equal(
+            new[]
+            {
+                MasterStackLayoutMode.MasterLeft,
+                MasterStackLayoutMode.Grid,
+                MasterStackLayoutMode.Dwindle,
+                MasterStackLayoutMode.CenteredMaster
+            },
+            settings.ToLayoutCycleOrder());
+    }
+
+    [Fact]
+    public void ToLayoutCycleOrder_UnknownName_Throws()
+    {
+        var settings = new RootlessWMSettings(8, 8, Layouts: new LayoutsSettings(["NotALayout"]));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => settings.ToLayoutCycleOrder());
+    }
+
+    [Fact]
+    public void ToLayoutCycleOrder_DuplicateName_Throws()
+    {
+        var settings = new RootlessWMSettings(8, 8, Layouts: new LayoutsSettings(["Grid", "Grid"]));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => settings.ToLayoutCycleOrder());
     }
 
     [Fact]
@@ -218,7 +244,6 @@ public sealed class RootlessWMSettingsTests
             ["datetime"] = new WorkspaceBarWidgetSettings(Symbol: "TIME")
         };
         var settings = new RootlessWMSettings(
-            0.55,
             0,
             0,
             WorkspaceBar: new WorkspaceBarSettings(
@@ -273,7 +298,6 @@ public sealed class RootlessWMSettingsTests
             ["memory"] = new WorkspaceBarWidgetSettings(Enabled: false)
         };
         var settings = new RootlessWMSettings(
-            0.55,
             0,
             0,
             WorkspaceBar: new WorkspaceBarSettings(
@@ -290,7 +314,7 @@ public sealed class RootlessWMSettingsTests
     [Fact]
     public void ToWorkspaceBarOptions_InvalidHeight_Throws()
     {
-        var settings = new RootlessWMSettings(0.55, 0, 0, WorkspaceBar: new WorkspaceBarSettings(Height: 8));
+        var settings = new RootlessWMSettings(0, 0, WorkspaceBar: new WorkspaceBarSettings(Height: 8));
 
         Assert.Throws<ArgumentOutOfRangeException>(() => settings.ToWorkspaceBarOptions());
     }
@@ -298,7 +322,7 @@ public sealed class RootlessWMSettingsTests
     [Fact]
     public void ToWorkspaceBarOptions_InvalidColor_Throws()
     {
-        var settings = new RootlessWMSettings(0.55, 0, 0, WorkspaceBar: new WorkspaceBarSettings(Background: "not-a-color"));
+        var settings = new RootlessWMSettings(0, 0, WorkspaceBar: new WorkspaceBarSettings(Background: "not-a-color"));
 
         Assert.Throws<ArgumentOutOfRangeException>(() => settings.ToWorkspaceBarOptions());
     }
@@ -306,7 +330,7 @@ public sealed class RootlessWMSettingsTests
     [Fact]
     public void ToWorkspaceBarOptions_RgbaColor_PreservesAlpha()
     {
-        var settings = new RootlessWMSettings(0.55, 0, 0, WorkspaceBar: new WorkspaceBarSettings(Background: "#10203080"));
+        var settings = new RootlessWMSettings(0, 0, WorkspaceBar: new WorkspaceBarSettings(Background: "#10203080"));
 
         var options = settings.ToWorkspaceBarOptions();
 
@@ -316,7 +340,7 @@ public sealed class RootlessWMSettingsTests
     [Fact]
     public void Reserve_VisibleBar_OffsetsAndShrinksWorkArea()
     {
-        var options = new RootlessWMSettings(0.55, 0, 0, WorkspaceBar: new WorkspaceBarSettings(Visible: true, Height: 24))
+        var options = new RootlessWMSettings(0, 0, WorkspaceBar: new WorkspaceBarSettings(Visible: true, Height: 24))
             .ToWorkspaceBarOptions();
 
         var reserved = options.Reserve(new WindowBounds(100, 200, 800, 600));
@@ -327,7 +351,7 @@ public sealed class RootlessWMSettingsTests
     [Fact]
     public void Reserve_HiddenBar_DoesNotChangeWorkArea()
     {
-        var options = new RootlessWMSettings(0.55, 0, 0, WorkspaceBar: new WorkspaceBarSettings(Visible: false))
+        var options = new RootlessWMSettings(0, 0, WorkspaceBar: new WorkspaceBarSettings(Visible: false))
             .ToWorkspaceBarOptions();
         var workArea = new WindowBounds(100, 200, 800, 600);
 
@@ -340,7 +364,6 @@ public sealed class RootlessWMSettingsTests
     public void Reserve_WithBarMargin_ReservesTransparentSeparation()
     {
         var options = new RootlessWMSettings(
-            0.55,
             0,
             0,
             WorkspaceBar: new WorkspaceBarSettings(
@@ -358,7 +381,7 @@ public sealed class RootlessWMSettingsTests
     [InlineData("Left")]
     public void Reserve_LeftPosition_OffsetsAndShrinksWorkArea(string position)
     {
-        var options = new RootlessWMSettings(0.55, 0, 0, WorkspaceBar: new WorkspaceBarSettings(Visible: true, Height: 24, Position: position))
+        var options = new RootlessWMSettings(0, 0, WorkspaceBar: new WorkspaceBarSettings(Visible: true, Height: 24, Position: position))
             .ToWorkspaceBarOptions();
 
         var reserved = options.Reserve(new WindowBounds(100, 200, 800, 600));
@@ -370,7 +393,7 @@ public sealed class RootlessWMSettingsTests
     [Fact]
     public void Reserve_RightPosition_OffsetsAndShrinksWorkArea()
     {
-        var options = new RootlessWMSettings(0.55, 0, 0, WorkspaceBar: new WorkspaceBarSettings(Visible: true, Height: 24, Position: "right"))
+        var options = new RootlessWMSettings(0, 0, WorkspaceBar: new WorkspaceBarSettings(Visible: true, Height: 24, Position: "right"))
             .ToWorkspaceBarOptions();
 
         var reserved = options.Reserve(new WindowBounds(100, 200, 800, 600));
@@ -381,7 +404,7 @@ public sealed class RootlessWMSettingsTests
     [Fact]
     public void Reserve_BottomPosition_OffsetsAndShrinksWorkArea()
     {
-        var options = new RootlessWMSettings(0.55, 0, 0, WorkspaceBar: new WorkspaceBarSettings(Visible: true, Height: 24, Position: "bottom"))
+        var options = new RootlessWMSettings(0, 0, WorkspaceBar: new WorkspaceBarSettings(Visible: true, Height: 24, Position: "bottom"))
             .ToWorkspaceBarOptions();
 
         var reserved = options.Reserve(new WindowBounds(100, 200, 800, 600));
@@ -393,7 +416,7 @@ public sealed class RootlessWMSettingsTests
     [Fact]
     public void ToWorkspaceBarOptions_InvalidPosition_Throws()
     {
-        var settings = new RootlessWMSettings(0.55, 0, 0, WorkspaceBar: new WorkspaceBarSettings(Position: "diagonal"));
+        var settings = new RootlessWMSettings(0, 0, WorkspaceBar: new WorkspaceBarSettings(Position: "diagonal"));
 
         Assert.Throws<ArgumentOutOfRangeException>(() => settings.ToWorkspaceBarOptions());
     }
@@ -401,7 +424,7 @@ public sealed class RootlessWMSettingsTests
     [Fact]
     public void ToWorkspaceBarOptions_ThicknessAlias_OverridesHeight()
     {
-        var settings = new RootlessWMSettings(0.55, 0, 0, WorkspaceBar: new WorkspaceBarSettings(Height: 24, Thickness: 40));
+        var settings = new RootlessWMSettings(0, 0, WorkspaceBar: new WorkspaceBarSettings(Height: 24, Thickness: 40));
 
         var options = settings.ToWorkspaceBarOptions();
 
@@ -420,7 +443,6 @@ public sealed class RootlessWMSettingsTests
     public void ToWorkspaceBarOptions_MapsSectionsAndCommandWidget()
     {
         var settings = new RootlessWMSettings(
-            0.55,
             0,
             0,
             WorkspaceBar: new WorkspaceBarSettings(

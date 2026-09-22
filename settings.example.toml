@@ -2,11 +2,8 @@
 # Copy this file to %LOCALAPPDATA%\RootlessWM\settings.toml and edit to taste.
 # All keys are optional; omitted keys fall back to their defaults.
 
-master-ratio = 0.6
 outer-gap = 8
 inner-gap = 8
-layout = "MasterLeft"
-master-count = 1
 
 # Focus a managed window when the pointer moves over it.
 # Owned popups and context menus keep focus until dismissed.
@@ -27,6 +24,18 @@ hide-explorer-on-start = false
 # Useful for windows that auto-elevate (e.g. Task Manager on Windows 11): a non-elevated
 # RootlessWM cannot reposition them, so excluding them here avoids the wasted retile attempts.
 # excluded-executables = ["Taskmgr"]
+
+# default is the layout applied on startup.
+# master-ratio and master-count only affect the master-stack layouts (MasterLeft, MasterTop).
+# enabled is the single source of truth for CycleLayout / CycleLayoutPrevious: its order
+# determines the cycle order, and layouts left out of the list are never reached by cycling.
+# Omit this section to cycle through the built-in default order (MasterLeft, MasterTop,
+# Monocle, Floating).
+[Layouts]
+default = "MasterLeft"
+master-ratio = 0.6
+master-count = 1
+enabled = ["MasterLeft", "MasterTop", "Grid", "Fibonacci", "Dwindle", "CenteredMaster", "Monocle", "Floating"]
 
 [statusbar]
 visible = true
@@ -59,7 +68,7 @@ on-click = "workspace"
 
 [module.layout]
 type = "layout"
-symbols = { MasterLeft = "[]=", MasterTop = "TTT", monocle = "MON", floating = "FLT" }
+symbols = { MasterLeft = "[]=", MasterTop = "TTT", monocle = "MON", floating = "FLT", grid = "GRD", fibonacci = "FIB", dwindle = "DWL", centeredmaster = "CTR" }
 
 [module.window-title]
 type = "window-title"
@@ -207,6 +216,13 @@ FocusPreviousMonitor = "Alt+Shift+H"
 MoveToNextMonitor = "Alt+Ctrl+L"
 MoveToPreviousMonitor = "Alt+Ctrl+H"
 CycleLayout = "Alt+Space"
+CycleLayoutPrevious = "Alt+Shift+Space"
+# Optional direct layout hotkeys: unconfigured entries register nothing and do not
+# affect layouts.enabled or the cycle order (see the [Layouts] section above).
+# SelectLayoutMasterLeft = "Alt+Shift+M"
+# SelectLayoutGrid = "Alt+Shift+G"
+# SelectLayoutDwindle = "Alt+Shift+D"
+# SelectLayoutCenteredMaster = "Alt+Shift+C"
 MaximizeWindow = "Alt+Shift+F"
 ToggleFloating = "Alt+F"
 SwapWithNext = "Alt+Shift+J"

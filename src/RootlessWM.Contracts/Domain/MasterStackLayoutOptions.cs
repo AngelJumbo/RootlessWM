@@ -12,20 +12,6 @@ public readonly record struct MasterStackLayoutOptions(
 
     public static MasterStackLayoutOptions Default { get; } = new(0.55, 0, 0);
 
-    public MasterStackLayoutOptions CycleMode()
-    {
-        return this with
-        {
-            Mode = Mode switch
-            {
-                MasterStackLayoutMode.MasterLeft => MasterStackLayoutMode.MasterTop,
-                MasterStackLayoutMode.MasterTop => MasterStackLayoutMode.Monocle,
-                MasterStackLayoutMode.Monocle => MasterStackLayoutMode.Floating,
-                _ => MasterStackLayoutMode.MasterLeft
-            }
-        };
-    }
-
     public void Validate()
     {
         if (MasterRatio is < 0.05 or > 0.95)

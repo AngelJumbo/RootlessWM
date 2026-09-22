@@ -47,6 +47,7 @@ internal sealed class TomlSettingsProvider
 
         var settings = MapSettings(model);
         _ = settings.ToLayoutOptions();
+        _ = settings.ToLayoutCycleOrder();
         _ = settings.ToWorkspaceBarOptions();
         settings.ValidateRunnerColors();
         ValidateHotkeys(settings);
@@ -87,19 +88,28 @@ internal sealed class TomlSettingsProvider
     private static RootlessWMSettings MapSettings(TomlTable table)
     {
         return new RootlessWMSettings(
-            GetDouble(table, "MasterRatio") ?? 0.55,
             (int)(GetLong(table, "OuterGap") ?? 0),
             (int)(GetLong(table, "InnerGap") ?? 0),
             GetStringMap(table, "Hotkeys"),
-            GetString(table, "Layout") ?? "MasterLeft",
-            (int)(GetLong(table, "MasterCount") ?? 1),
             MapWorkspaceBar(GetTable(table, "StatusBar"), GetTable(table, "Module")),
             MapToggleExplorerBehaviour(GetString(table, "ToggleExplorerBehaviour") ?? "TaskbarOnly"),
             MapRunner(GetTable(table, "Runner")),
             GetBool(table, "HideExplorerOnStart") ?? false,
             GetStringList(table, "ExcludedExecutables"),
             GetBool(table, "FocusFollowsMouse") ?? true,
-            MapLaunchHotkeys(table));
+            MapLaunchHotkeys(table),
+            MapLayouts(GetTable(table, "Layouts")));
+    }
+
+    private static LayoutsSettings? MapLayouts(TomlTable? table)
+    {
+        return table is null
+            ? null
+            : new LayoutsSettings(
+                GetStringList(table, "Enabled"),
+                GetString(table, "Default") ?? "MasterLeft",
+                GetDouble(table, "MasterRatio") ?? 0.6,
+                (int)(GetLong(table, "MasterCount") ?? 1));
     }
 
     private static ToggleExplorerBehaviour MapToggleExplorerBehaviour(string value)

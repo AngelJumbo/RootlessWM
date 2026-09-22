@@ -391,7 +391,8 @@ internal sealed class WmApplication
         if (result.Success)
         {
             _lastSettingsError = null;
-            _log.Info("settings_loaded", new { _settings.MasterRatio, _settings.OuterGap, _settings.InnerGap, _settings.MasterCount });
+            var layoutOptions = _settings.ToLayoutOptions();
+            _log.Info("settings_loaded", new { layoutOptions.MasterRatio, layoutOptions.OuterGap, layoutOptions.InnerGap, layoutOptions.MasterCount });
             return true;
         }
 

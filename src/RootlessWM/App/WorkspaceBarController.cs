@@ -1376,6 +1376,10 @@ internal sealed class WorkspaceBarController : IDisposable
                 MasterStackLayoutMode.MasterTop => "MT",
                 MasterStackLayoutMode.Monocle => "MON",
                 MasterStackLayoutMode.Floating => "FLT",
+                MasterStackLayoutMode.Grid => "GRD",
+                MasterStackLayoutMode.Fibonacci => "FIB",
+                MasterStackLayoutMode.Dwindle => "DWL",
+                MasterStackLayoutMode.CenteredMaster => "CTR",
                 _ => "?"
             };
         }

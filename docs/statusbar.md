@@ -70,7 +70,7 @@ Any module or widget text containing a literal newline (`\n`) is rendered as mul
 | Module | Format behavior | Default output / format | Supported values |
 | :--- | :--- | :--- | :--- |
 | `workspaces` | No `format` | Labels from `labels`, or `1` through `9` | Active state uses `active-bg` and `active-fg`. |
-| `layout` | No `format` | Configured `symbols`, or built-in abbreviation | `MasterLeft`, `MasterTop`, `monocle`, `floating`. |
+| `layout` | No `format` | Configured `symbols`, or built-in abbreviation | `MasterLeft`, `MasterTop`, `monocle`, `floating`, `grid`, `fibonacci`, `dwindle`, `centeredmaster`. |
 | `window-title` | No `format` | Focused window title | `max-length` limits the title (character count). |
 | `cpu` | Yes | `{percent}%` | `{percent}` |
 | `memory` | Yes | `{used_percent}%` | `{used_percent}` |

@@ -5,32 +5,65 @@ using RootlessWM.Domain;
 namespace RootlessWM.App;
 
 public sealed record RootlessWMSettings(
-    double MasterRatio,
     int OuterGap,
     int InnerGap,
     IReadOnlyDictionary<string, string>? Hotkeys = null,
-    string Layout = "MasterLeft",
-    int MasterCount = 1,
     [property: JsonPropertyName("StatusBar")] WorkspaceBarSettings? WorkspaceBar = null,
     ToggleExplorerBehaviour ToggleExplorerBehaviour = ToggleExplorerBehaviour.TaskbarOnly,
     RunnerSettings? Runner = null,
     bool HideExplorerOnStart = false,
     IReadOnlyList<string>? ExcludedExecutables = null,
     bool FocusFollowsMouse = true,
-    IReadOnlyList<LaunchHotkeySettings>? Launch = null)
+    IReadOnlyList<LaunchHotkeySettings>? Launch = null,
+    LayoutsSettings? Layouts = null)
 {
-    public static RootlessWMSettings Default { get; } = new(0.55, 0, 0);
+    public static RootlessWMSettings Default { get; } = new(0, 0);
 
     public MasterStackLayoutOptions ToLayoutOptions()
     {
-        if (!Enum.TryParse<MasterStackLayoutMode>(Layout, true, out var mode))
+        var layouts = Layouts ?? LayoutsSettings.Empty;
+        if (!Enum.TryParse<MasterStackLayoutMode>(layouts.Default, true, out var mode))
         {
-            throw new ArgumentOutOfRangeException(nameof(Layout), "The layout mode is not supported.");
+            throw new ArgumentOutOfRangeException(nameof(Layouts), layouts.Default, "The layout mode is not supported.");
         }
 
-        var options = new MasterStackLayoutOptions(MasterRatio, OuterGap, InnerGap, mode, MasterCount);
+        var options = new MasterStackLayoutOptions(layouts.MasterRatio, OuterGap, InnerGap, mode, layouts.MasterCount);
         options.Validate();
         return options;
+    }
+
+    public IReadOnlyList<MasterStackLayoutMode> ToLayoutCycleOrder()
+    {
+        var names = Layouts?.Enabled;
+        if (names is null || names.Count == 0)
+        {
+            return LayoutCatalog.DefaultCycleOrder;
+        }
+
+        var seen = new HashSet<MasterStackLayoutMode>();
+        var order = new List<MasterStackLayoutMode>(names.Count);
+        foreach (var name in names)
+        {
+            if (!Enum.TryParse<MasterStackLayoutMode>(name, true, out var mode))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(Layouts),
+                    name,
+                    $"Unknown layout '{name}' in layouts.enabled. Valid values: {string.Join(", ", Enum.GetNames<MasterStackLayoutMode>())}.");
+            }
+
+            if (!seen.Add(mode))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(Layouts),
+                    name,
+                    $"Duplicate layout '{name}' in layouts.enabled.");
+            }
+
+            order.Add(mode);
+        }
+
+        return order;
     }
 
     internal void ValidateRunnerColors()

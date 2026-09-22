@@ -11,13 +11,90 @@ public sealed class LayoutStateTests
         var state = new LayoutState();
         var fallback = new MasterStackLayoutOptions(0.55, 8, 8);
 
-        _ = state.Cycle(0, (nint)100, fallback);
-        _ = state.Cycle(1, (nint)200, fallback);
+        _ = state.Cycle(0, (nint)100, fallback, LayoutCatalog.DefaultCycleOrder);
+        _ = state.Cycle(1, (nint)200, fallback, LayoutCatalog.DefaultCycleOrder);
 
         Assert.Equal(MasterStackLayoutMode.MasterTop, state.Get(0, (nint)100, fallback).Mode);
         Assert.Equal(MasterStackLayoutMode.MasterTop, state.Get(1, (nint)200, fallback).Mode);
         Assert.Equal(MasterStackLayoutMode.MasterLeft, state.Get(0, (nint)200, fallback).Mode);
         Assert.Equal(MasterStackLayoutMode.MasterLeft, state.Get(1, (nint)100, fallback).Mode);
+    }
+
+    [Fact]
+    public void Cycle_UsesConfiguredOrder_WrapsAtEnd()
+    {
+        var state = new LayoutState();
+        var fallback = new MasterStackLayoutOptions(0.55, 8, 8, MasterStackLayoutMode.CenteredMaster);
+        var order = new[]
+        {
+            MasterStackLayoutMode.Grid,
+            MasterStackLayoutMode.Dwindle,
+            MasterStackLayoutMode.CenteredMaster
+        };
+
+        var first = state.Cycle(0, (nint)100, fallback, order);
+        Assert.Equal(MasterStackLayoutMode.Grid, first.Mode);
+
+        var second = state.Cycle(0, (nint)100, fallback, order);
+        Assert.Equal(MasterStackLayoutMode.Dwindle, second.Mode);
+
+        var third = state.Cycle(0, (nint)100, fallback, order);
+        Assert.Equal(MasterStackLayoutMode.CenteredMaster, third.Mode);
+
+        var wrapped = state.Cycle(0, (nint)100, fallback, order);
+        Assert.Equal(MasterStackLayoutMode.Grid, wrapped.Mode);
+    }
+
+    [Fact]
+    public void CyclePrevious_WrapsAtStart()
+    {
+        var state = new LayoutState();
+        var fallback = new MasterStackLayoutOptions(0.55, 8, 8, MasterStackLayoutMode.Grid);
+        var order = new[]
+        {
+            MasterStackLayoutMode.Grid,
+            MasterStackLayoutMode.Dwindle,
+            MasterStackLayoutMode.CenteredMaster
+        };
+
+        var previous = state.CyclePrevious(0, (nint)100, fallback, order);
+
+        Assert.Equal(MasterStackLayoutMode.CenteredMaster, previous.Mode);
+    }
+
+    [Fact]
+    public void Cycle_CurrentModeNotInOrder_FallsBackToStartOfList()
+    {
+        var state = new LayoutState();
+        var fallback = new MasterStackLayoutOptions(0.55, 8, 8);
+        var order = new[] { MasterStackLayoutMode.Grid, MasterStackLayoutMode.Dwindle };
+
+        _ = state.SetMode(0, (nint)100, fallback, MasterStackLayoutMode.Fibonacci);
+        var next = state.Cycle(0, (nint)100, fallback, order);
+        Assert.Equal(MasterStackLayoutMode.Grid, next.Mode);
+
+        _ = state.SetMode(0, (nint)100, fallback, MasterStackLayoutMode.Fibonacci);
+        var previous = state.CyclePrevious(0, (nint)100, fallback, order);
+        Assert.Equal(MasterStackLayoutMode.Dwindle, previous.Mode);
+    }
+
+    [Fact]
+    public void SetMode_DoesNotAffectSubsequentCycleOrder_WhenModeIsInList()
+    {
+        var state = new LayoutState();
+        var fallback = new MasterStackLayoutOptions(0.55, 8, 8);
+        var order = new[]
+        {
+            MasterStackLayoutMode.MasterLeft,
+            MasterStackLayoutMode.Grid,
+            MasterStackLayoutMode.Dwindle,
+            MasterStackLayoutMode.CenteredMaster
+        };
+
+        _ = state.SetMode(0, (nint)100, fallback, MasterStackLayoutMode.Dwindle);
+
+        var next = state.Cycle(0, (nint)100, fallback, order);
+        Assert.Equal(MasterStackLayoutMode.CenteredMaster, next.Mode);
     }
 
     [Fact]

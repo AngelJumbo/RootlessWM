@@ -12,7 +12,8 @@ Hotkeys support modifier combinations using `Alt`, `Ctrl`, `Shift`, and `Win`/`S
 | `SwapWithPrevious` | `Alt+Shift+K` | Swap the active window with the previous window. |
 | `PromoteToMaster` | `Alt+M` | Move the focused window into the master position. |
 | `Close` | `Alt+Q` | Close the active window. |
-| `CycleLayout` | `Alt+Space` | Cycle through layout modes. |
+| `CycleLayout` | `Alt+Space` | Cycle forward through `layouts.enabled`. |
+| `CycleLayoutPrevious` | `Alt+Shift+Space` | Cycle backward through `layouts.enabled`. |
 | `MaximizeWindow` | `Alt+Shift+F` | Toggle fullscreen mode. |
 | `ToggleFloating` | `Alt+F` | Toggle tiling on the active window. |
 | `IncreaseMasterRatio` / `DecreaseMasterRatio` | `Alt+L` / `Alt+H` | Adjust the master-area ratio. |
@@ -29,6 +30,26 @@ Hotkeys support modifier combinations using `Alt`, `Ctrl`, `Shift`, and `Win`/`S
 | Enable management | `Alt+Shift+R` | Enable management and tile again. |
 
 A shortcut registered by another application is skipped and reported in `management_started`; it does not stop the session.
+
+## Direct Layout Hotkeys
+
+Every layout can optionally be bound to a hotkey that switches to it immediately, without
+affecting `layouts.enabled` or the cycling order. Unconfigured entries have no default binding
+and register nothing.
+
+```toml
+[Hotkeys]
+SelectLayoutMasterLeft = "Alt+Shift+M"
+SelectLayoutGrid = "Alt+Shift+G"
+SelectLayoutDwindle = "Alt+Shift+D"
+SelectLayoutCenteredMaster = "Alt+Shift+C"
+```
+
+Available actions: `SelectLayoutMasterLeft`, `SelectLayoutMasterTop`, `SelectLayoutMonocle`,
+`SelectLayoutFloating`, `SelectLayoutGrid`, `SelectLayoutFibonacci`, `SelectLayoutDwindle`,
+`SelectLayoutCenteredMaster`. After a direct selection, `CycleLayout`/`CycleLayoutPrevious`
+resume from that layout's position in `layouts.enabled` (or from the start of the list if the
+selected layout isn't in it). See [Configuration](docs/configuration.md) for `layouts.enabled`.
 
 ## Program Launch Hotkeys
 

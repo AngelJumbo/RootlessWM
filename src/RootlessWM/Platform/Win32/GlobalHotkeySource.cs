@@ -39,6 +39,15 @@ internal sealed class GlobalHotkeySource : IDisposable
         (46, NativeMethods.ModAlt, NativeMethods.VkE, TilingCommand.ToggleExplorer),
         (47, NativeMethods.ModAlt, NativeMethods.VkP, TilingCommand.OpenRunner),
         (48, NativeMethods.ModAlt, NativeMethods.VkB, TilingCommand.ToggleStatusBar),
+        (49, NativeMethods.ModAlt | NativeMethods.ModShift, NativeMethods.VkSpace, TilingCommand.CycleLayoutPrevious),
+        (50, 0, 0, TilingCommand.SelectLayoutMasterLeft),
+        (51, 0, 0, TilingCommand.SelectLayoutMasterTop),
+        (52, 0, 0, TilingCommand.SelectLayoutMonocle),
+        (53, 0, 0, TilingCommand.SelectLayoutFloating),
+        (54, 0, 0, TilingCommand.SelectLayoutGrid),
+        (55, 0, 0, TilingCommand.SelectLayoutFibonacci),
+        (56, 0, 0, TilingCommand.SelectLayoutDwindle),
+        (57, 0, 0, TilingCommand.SelectLayoutCenteredMaster),
         (21, NativeMethods.ModAlt, NativeMethods.Vk1, TilingCommand.SelectWorkspace1),
         (22, NativeMethods.ModAlt, NativeMethods.Vk2, TilingCommand.SelectWorkspace2),
         (23, NativeMethods.ModAlt, NativeMethods.Vk3, TilingCommand.SelectWorkspace3),
@@ -75,7 +84,14 @@ internal sealed class GlobalHotkeySource : IDisposable
         foreach (var binding in Bindings)
         {
             var configuredBinding = GetConfiguredBinding(binding, overrides);
-            if (!NativeMethods.RegisterHotKey(nint.Zero, binding.Identifier, configuredBinding.Modifiers, configuredBinding.VirtualKey))
+            if (configuredBinding is null)
+            {
+                // No default binding and no user override: this is an optional hotkey
+                // (e.g. a direct-layout select command) that is simply not registered.
+                continue;
+            }
+
+            if (!NativeMethods.RegisterHotKey(nint.Zero, binding.Identifier, configuredBinding.Value.Modifiers, configuredBinding.Value.VirtualKey))
             {
                 unavailableCommands.Add(binding.Command);
                 continue;
@@ -110,7 +126,7 @@ internal sealed class GlobalHotkeySource : IDisposable
         return unavailableCommands;
     }
 
-    private static (uint Modifiers, uint VirtualKey) GetConfiguredBinding(
+    private static (uint Modifiers, uint VirtualKey)? GetConfiguredBinding(
         (int Identifier, uint Modifiers, uint VirtualKey, TilingCommand Command) defaultBinding,
         IReadOnlyDictionary<string, string>? overrides)
     {
@@ -121,7 +137,9 @@ internal sealed class GlobalHotkeySource : IDisposable
             return (modifiers, virtualKey);
         }
 
-        return (defaultBinding.Modifiers, defaultBinding.VirtualKey);
+        // Modifiers == 0 marks an optional hotkey (e.g. a direct-layout select command) with no
+        // default binding: it stays unregistered unless the user configures an override above.
+        return defaultBinding.Modifiers == 0 ? null : (defaultBinding.Modifiers, defaultBinding.VirtualKey);
     }
 
     private static bool TryParseBinding(string value, out uint modifiers, out uint virtualKey)
