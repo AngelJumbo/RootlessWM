@@ -767,7 +767,7 @@ internal sealed class WorkspaceBarController : IDisposable
                 var itemLength = (_isVertical ? LineHeight(module.Style) : MeasureText(text, module.Style)) + 8;
                 var itemRect = MakePrimaryRect(rect, cursor, itemLength);
                 var active = index == _currentWorkspace;
-                DrawFill(canvas, itemRect, active ? module.ActiveBackground ?? module.Style.Background : module.Style.Background, module.Style.BorderRadius);
+                if(active) DrawFill(canvas, itemRect, module.ActiveBackground ?? module.Style.Background , module.Style.BorderRadius);
                 DrawText(canvas, text, itemRect, active ? module.ActiveForeground ?? module.Style.Foreground : module.Style.Foreground, module.Style, SKTextAlign.Center);
                 if (!string.IsNullOrEmpty(module.OnClick))
                 {
@@ -934,7 +934,8 @@ internal sealed class WorkspaceBarController : IDisposable
                 var itemLength = (_isVertical ? LineHeight(style) : MeasureText(text, style)) + 8;
                 var itemRect = MakePrimaryRect(rect, cursor, itemLength);
                 var active = index == _currentWorkspace;
-                DrawFill(canvas, itemRect, active ? _options.Workspaces.CurrentBackground : _options.Workspaces.Background, 0);
+                // Color.transparent
+                if(active) DrawFill(canvas, itemRect, _options.Workspaces.CurrentBackground , 0);
                 DrawText(canvas, text, itemRect, active ? _options.Workspaces.CurrentForeground : _options.Workspaces.Foreground, style, SKTextAlign.Center);
                 cursor = PrimaryStart(itemRect) + itemLength + 4;
             }
