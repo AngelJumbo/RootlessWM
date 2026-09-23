@@ -105,12 +105,9 @@ public sealed record RootlessWMSettings(
             throw new ArgumentOutOfRangeException(nameof(WorkspaceBar), bar.Position, "The workspace bar position must be top, bottom, left, or right.");
         }
 
-        var workspaces = bar.Workspaces ?? WorkspaceBarWorkspaceSettings.Default;
-        var layout = bar.Layout ?? WorkspaceBarLayoutSettings.Default;
-        var title = bar.Title ?? WorkspaceBarTitleSettings.Default;
-        var widgets = bar.Widgets ?? WorkspaceBarWidgetsSettings.Default;
         var style = ParseStyle(bar.Style, ParseColor(bar.Background, nameof(bar.Background)));
-        var modules = bar.Modules ?? new Dictionary<string, WorkspaceBarModuleSettings>(StringComparer.OrdinalIgnoreCase);
+        var defaultModules = bar.Modules is null;
+        var modules = defaultModules ? DefaultModules() : bar.Modules!;
         var moduleOptions = modules.ToDictionary(
             pair => pair.Key,
             pair => BuildModuleOption(pair.Key, pair.Value, style),
@@ -123,28 +120,23 @@ public sealed record RootlessWMSettings(
             bar.Visible,
             thickness,
             ParseColor(bar.Background, nameof(bar.Background)),
-            new WorkspaceBarWorkspaceOptions(
-                ParseColor(workspaces.Background, nameof(workspaces.Background)),
-                ParseColor(workspaces.Foreground, nameof(workspaces.Foreground)),
-                ParseColor(workspaces.CurrentBackground, nameof(workspaces.CurrentBackground)),
-                ParseColor(workspaces.CurrentForeground, nameof(workspaces.CurrentForeground)),
-                workspaces.Symbols ?? []),
-            new WorkspaceBarLayoutOptions(
-                ParseColor(layout.Background, nameof(layout.Background)),
-                ParseColor(layout.Foreground, nameof(layout.Foreground)),
-                ParseLayoutSymbols(layout.Symbols)),
-            new WorkspaceBarTitleOptions(
-                ParseColor(title.Background, nameof(title.Background)),
-                ParseColor(title.CurrentBackground, nameof(title.CurrentBackground)),
-                ParseColor(title.CurrentForeground, nameof(title.CurrentForeground))),
-            BuildWidgetOptions(widgets, style),
             style,
-            BuildSections(bar.Sections, style),
-            bar.Modules is null ? null : BuildModules(bar.ModulesLeft),
-            bar.Modules is null ? null : BuildModules(bar.ModulesCenter),
-            bar.Modules is null ? null : BuildModules(bar.ModulesRight),
+            BuildModules(defaultModules ? ["workspaces", "layout"] : bar.ModulesLeft),
+            BuildModules(defaultModules ? ["window-title"] : bar.ModulesCenter),
+            BuildModules(defaultModules ? ["datetime"] : bar.ModulesRight),
             position);
     }
+
+    // Modules used when the configuration defines no [module.*] tables, so the bar still shows
+    // workspaces, the layout symbol, the focused window title, and the time out of the box.
+    private static IReadOnlyDictionary<string, WorkspaceBarModuleSettings> DefaultModules()
+        => new Dictionary<string, WorkspaceBarModuleSettings>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["workspaces"] = new(),
+            ["layout"] = new(),
+            ["window-title"] = new(),
+            ["datetime"] = new()
+        };
 
     private static WorkspaceBarModuleOptions BuildModuleOption(string id, WorkspaceBarModuleSettings module, WorkspaceBarStyleOptions barStyle)
     {
@@ -213,68 +205,6 @@ public sealed record RootlessWMSettings(
         }
 
         return result;
-    }
-
-    private static IReadOnlyList<WorkspaceBarWidgetOptions> BuildWidgetOptions(WorkspaceBarWidgetsSettings widgets, WorkspaceBarStyleOptions barStyle)
-    {
-        var configured = widgets.Widgets ?? new Dictionary<string, WorkspaceBarWidgetSettings>(StringComparer.OrdinalIgnoreCase);
-        var order = widgets.Order ?? ["cpu", "memory", "datetime"];
-        var options = new List<WorkspaceBarWidgetOptions>();
-        foreach (var id in order)
-        {
-            if (!configured.TryGetValue(id, out var widget))
-            {
-                widget = new WorkspaceBarWidgetSettings();
-            }
-
-            if (!widget.Enabled)
-            {
-                continue;
-            }
-
-            var symbolBackground = ParseColor(widget.SymbolBackground, nameof(widget.SymbolBackground));
-            var symbolForeground = ParseColor(widget.SymbolForeground, nameof(widget.SymbolForeground));
-            var resultBackground = ParseColor(widget.ResultBackground, nameof(widget.ResultBackground));
-            var resultForeground = ParseColor(widget.ResultForeground, nameof(widget.ResultForeground));
-            options.Add(new WorkspaceBarWidgetOptions(
-                widget.Kind ?? id,
-                widget.Symbol,
-                symbolBackground,
-                symbolForeground,
-                resultBackground,
-                resultForeground,
-                widget.Text,
-                widget.Command,
-                Math.Clamp(widget.IntervalMilliseconds, 250, 3600000),
-                ParseStyle(widget.Style, barStyle with { Background = resultBackground, Foreground = resultForeground })));
-            options[^1] = options[^1] with { Id = id };
-        }
-
-        return options;
-    }
-
-    private static IReadOnlyList<WorkspaceBarSectionOptions> BuildSections(
-        IReadOnlyList<WorkspaceBarSectionSettings>? sections,
-        WorkspaceBarStyleOptions barStyle)
-    {
-        if (sections is null || sections.Count == 0)
-        {
-            return [
-                new("workspaces", WorkspaceBarSectionAlignment.Left, barStyle with { Alignment = WorkspaceBarSectionAlignment.Left }, []),
-                new("layout", WorkspaceBarSectionAlignment.Left, barStyle with { Alignment = WorkspaceBarSectionAlignment.Left }, []),
-                new("title", WorkspaceBarSectionAlignment.Center, barStyle with { Alignment = WorkspaceBarSectionAlignment.Center }, []),
-                new("widgets", WorkspaceBarSectionAlignment.Right, barStyle with { Alignment = WorkspaceBarSectionAlignment.Right }, [])
-            ];
-        }
-
-        return sections
-            .Where(section => !string.IsNullOrWhiteSpace(section.Id))
-            .Select(section => new WorkspaceBarSectionOptions(
-                section.Id,
-                ParseAlignment(section.Align),
-                ParseStyle(section.Style, barStyle) with { Alignment = ParseAlignment(section.Align) },
-                section.Widgets ?? []))
-            .ToList();
     }
 
     private static WorkspaceBarStyleOptions ParseStyle(WorkspaceBarStyleSettings? style, Color fallbackBackground)
@@ -353,17 +283,11 @@ public sealed record RootlessWMSettings(
             style.FontFamily ?? fallback.FontFamily,
             style.FontSize ?? fallback.FontSize,
             fontStyle,
-            style.Align is null ? fallback.Alignment : ParseAlignment(style.Align),
             style.MinWidth ?? fallback.MinWidth,
             style.MaxWidth ?? fallback.MaxWidth,
             style.Visible ?? fallback.Visible,
             style.MaxLength ?? fallback.MaxLength);
     }
-
-    private static WorkspaceBarSectionAlignment ParseAlignment(string value)
-        => Enum.TryParse<WorkspaceBarSectionAlignment>(value, true, out var alignment)
-            ? alignment
-            : WorkspaceBarSectionAlignment.Left;
 
     private static Color ParseColor(string value, string propertyName)
     {
@@ -394,67 +318,13 @@ public sealed record WorkspaceBarSettings(
     int? Thickness = null,
     string? Position = null,
     string Background = "#101010",
-    WorkspaceBarWorkspaceSettings? Workspaces = null,
-    WorkspaceBarLayoutSettings? Layout = null,
-    WorkspaceBarTitleSettings? Title = null,
-    WorkspaceBarWidgetsSettings? Widgets = null,
     WorkspaceBarStyleSettings? Style = null,
-    IReadOnlyList<WorkspaceBarSectionSettings>? Sections = null,
     IReadOnlyList<string>? ModulesLeft = null,
     IReadOnlyList<string>? ModulesCenter = null,
     IReadOnlyList<string>? ModulesRight = null,
     IReadOnlyDictionary<string, WorkspaceBarModuleSettings>? Modules = null)
 {
     public static WorkspaceBarSettings Default { get; } = new();
-}
-
-public sealed record WorkspaceBarWorkspaceSettings(
-    string Background = "#101010",
-    string Foreground = "#D0D0D0",
-    string CurrentBackground = "#FFFFFF",
-    string CurrentForeground = "#101010",
-    IReadOnlyList<string>? Symbols = null)
-{
-    public static WorkspaceBarWorkspaceSettings Default { get; } = new();
-}
-
-public sealed record WorkspaceBarLayoutSettings(
-    string Background = "#101010",
-    string Foreground = "#D0D0D0",
-    IReadOnlyDictionary<string, string>? Symbols = null)
-{
-    public static WorkspaceBarLayoutSettings Default { get; } = new();
-}
-
-public sealed record WorkspaceBarTitleSettings(
-    string Background = "#101010",
-    string CurrentBackground = "#101010",
-    string CurrentForeground = "#FFFFFF")
-{
-    public static WorkspaceBarTitleSettings Default { get; } = new();
-}
-
-public sealed record WorkspaceBarWidgetsSettings(
-    IReadOnlyList<string>? Order = null,
-    IReadOnlyDictionary<string, WorkspaceBarWidgetSettings>? Widgets = null)
-{
-    public static WorkspaceBarWidgetsSettings Default { get; } = new();
-}
-
-public sealed record WorkspaceBarWidgetSettings(
-    bool Enabled = true,
-    string? Kind = null,
-    string Symbol = "",
-    string SymbolBackground = "#101010",
-    string SymbolForeground = "#D0D0D0",
-    string ResultBackground = "#101010",
-    string ResultForeground = "#D0D0D0",
-    string Text = "",
-    string Command = "",
-    int IntervalMilliseconds = 5000,
-    WorkspaceBarStyleSettings? Style = null)
-{
-    public static WorkspaceBarWidgetSettings Default { get; } = new();
 }
 
 public sealed record WorkspaceBarStyleSettings(
@@ -476,17 +346,10 @@ public sealed record WorkspaceBarStyleSettings(
     float? FontSize = null,
     string? Weight = null,
     bool? Italic = null,
-    string? Align = null,
     int? MinWidth = null,
     int? MaxWidth = null,
     bool? Visible = null,
     int? MaxLength = null);
-
-public sealed record WorkspaceBarSectionSettings(
-    string Id,
-    string Align = "left",
-    WorkspaceBarStyleSettings? Style = null,
-    IReadOnlyList<string>? Widgets = null);
 
 public sealed record WorkspaceBarModuleSettings(
     string? Type = null,

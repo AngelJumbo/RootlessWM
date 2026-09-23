@@ -7,12 +7,7 @@ public sealed record WorkspaceBarOptions(
     bool Visible,
     int Height,
     Color Background,
-    WorkspaceBarWorkspaceOptions Workspaces,
-    WorkspaceBarLayoutOptions Layout,
-    WorkspaceBarTitleOptions Title,
-    IReadOnlyList<WorkspaceBarWidgetOptions> Widgets,
     WorkspaceBarStyleOptions? Style = null,
-    IReadOnlyList<WorkspaceBarSectionOptions>? Sections = null,
     IReadOnlyList<WorkspaceBarModuleOptions>? ModulesLeft = null,
     IReadOnlyList<WorkspaceBarModuleOptions>? ModulesCenter = null,
     IReadOnlyList<WorkspaceBarModuleOptions>? ModulesRight = null,
@@ -67,7 +62,7 @@ public enum WorkspaceBarPosition
     Right
 }
 
-public enum WorkspaceBarSectionAlignment
+public enum WorkspaceBarAlignment
 {
     Left,
     Center,
@@ -86,7 +81,6 @@ public sealed record WorkspaceBarStyleOptions(
     string FontFamily,
     float FontSize,
     FontStyle FontStyle,
-    WorkspaceBarSectionAlignment Alignment,
     int? MinWidth,
     int? MaxWidth,
     bool Visible,
@@ -104,34 +98,10 @@ public sealed record WorkspaceBarStyleOptions(
         "Segoe UI",
         9F,
         FontStyle.Regular,
-        WorkspaceBarSectionAlignment.Left,
         null,
         null,
         true);
 }
-
-public sealed record WorkspaceBarSectionOptions(
-    string Id,
-    WorkspaceBarSectionAlignment Alignment,
-    WorkspaceBarStyleOptions Style,
-    IReadOnlyList<string> Widgets);
-
-public sealed record WorkspaceBarWorkspaceOptions(
-    Color Background,
-    Color Foreground,
-    Color CurrentBackground,
-    Color CurrentForeground,
-    IReadOnlyList<string> Symbols);
-
-public sealed record WorkspaceBarLayoutOptions(
-    Color Background,
-    Color Foreground,
-    IReadOnlyDictionary<MasterStackLayoutMode, string> Symbols);
-
-public sealed record WorkspaceBarTitleOptions(
-    Color Background,
-    Color CurrentBackground,
-    Color CurrentForeground);
 
 public sealed record WorkspaceBarWidgetOptions(
     string Kind,

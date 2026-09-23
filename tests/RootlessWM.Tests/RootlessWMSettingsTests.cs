@@ -238,11 +238,6 @@ public sealed class RootlessWMSettingsTests
     [Fact]
     public void ToWorkspaceBarOptions_ValidSettings_ReturnsConfiguredValues()
     {
-        var widgetSettings = new Dictionary<string, WorkspaceBarWidgetSettings>
-        {
-            ["cpu"] = new WorkspaceBarWidgetSettings(Symbol: "CPU", SymbolForeground: "#FF0000"),
-            ["datetime"] = new WorkspaceBarWidgetSettings(Symbol: "TIME")
-        };
         var settings = new RootlessWMSettings(
             0,
             0,
@@ -250,65 +245,29 @@ public sealed class RootlessWMSettingsTests
                 Visible: true,
                 Height: 28,
                 Background: "#202020",
-                Workspaces: new WorkspaceBarWorkspaceSettings(
-                    Background: "#111111",
-                    Foreground: "#BBBBBB",
-                    CurrentBackground: "#FFFFFF",
-                    CurrentForeground: "#000000",
-                    Symbols: ["A", "B", "C"]),
-                Layout: new WorkspaceBarLayoutSettings(
-                    Background: "#222222",
-                    Foreground: "#CCCCCC",
-                    Symbols: new Dictionary<string, string> { ["MasterLeft"] = "L" }),
-                Title: new WorkspaceBarTitleSettings(
-                    Background: "#333333",
-                    CurrentBackground: "#444444",
-                    CurrentForeground: "#EEEEEE"),
-                Widgets: new WorkspaceBarWidgetsSettings(
-                    Order: ["datetime", "cpu"],
-                    Widgets: widgetSettings)));
+                Modules: new Dictionary<string, WorkspaceBarModuleSettings>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["cpu"] = new WorkspaceBarModuleSettings(Type: "cpu", Format: "CPU {percent}%")
+                },
+                ModulesLeft: ["cpu"]));
 
         var options = settings.ToWorkspaceBarOptions();
 
         Assert.True(options.Visible);
         Assert.Equal(28, options.Height);
         Assert.Equal(ColorTranslator.FromHtml("#202020"), options.Background);
-        Assert.Equal(ColorTranslator.FromHtml("#111111"), options.Workspaces.Background);
-        Assert.Equal(ColorTranslator.FromHtml("#BBBBBB"), options.Workspaces.Foreground);
-        Assert.Equal(ColorTranslator.FromHtml("#FFFFFF"), options.Workspaces.CurrentBackground);
-        Assert.Equal(ColorTranslator.FromHtml("#000000"), options.Workspaces.CurrentForeground);
-        Assert.Equal(["A", "B", "C"], options.Workspaces.Symbols);
-        Assert.Equal(ColorTranslator.FromHtml("#222222"), options.Layout.Background);
-        Assert.Equal("L", options.Layout.Symbols[MasterStackLayoutMode.MasterLeft]);
-        Assert.Equal(ColorTranslator.FromHtml("#444444"), options.Title.CurrentBackground);
-        Assert.Equal(ColorTranslator.FromHtml("#EEEEEE"), options.Title.CurrentForeground);
-        Assert.Equal(2, options.Widgets.Count);
-        Assert.Equal("datetime", options.Widgets[0].Kind);
-        Assert.Equal("TIME", options.Widgets[0].Symbol);
-        Assert.Equal("cpu", options.Widgets[1].Kind);
-        Assert.Equal("CPU", options.Widgets[1].Symbol);
-        Assert.Equal(ColorTranslator.FromHtml("#FF0000"), options.Widgets[1].SymbolForeground);
+        Assert.Equal("cpu", options.ModulesLeft!.Single().Type);
+        Assert.Equal("CPU {percent}%", options.ModulesLeft!.Single().Format);
     }
 
     [Fact]
-    public void ToWorkspaceBarOptions_DisabledWidget_IsExcluded()
+    public void ToWorkspaceBarOptions_WithoutModules_UsesDefaultModules()
     {
-        var widgetSettings = new Dictionary<string, WorkspaceBarWidgetSettings>
-        {
-            ["memory"] = new WorkspaceBarWidgetSettings(Enabled: false)
-        };
-        var settings = new RootlessWMSettings(
-            0,
-            0,
-            WorkspaceBar: new WorkspaceBarSettings(
-                Widgets: new WorkspaceBarWidgetsSettings(
-                    Order: ["cpu", "memory", "datetime"],
-                    Widgets: widgetSettings)));
+        var options = RootlessWMSettings.Default.ToWorkspaceBarOptions();
 
-        var options = settings.ToWorkspaceBarOptions();
-
-        Assert.Equal(2, options.Widgets.Count);
-        Assert.DoesNotContain(options.Widgets, widget => widget.Kind == "memory");
+        Assert.Equal("workspaces", options.ModulesLeft!.First().Id);
+        Assert.Equal("window-title", options.ModulesCenter!.Single().Id);
+        Assert.Equal("datetime", options.ModulesRight!.Single().Id);
     }
 
     [Fact]
@@ -440,28 +399,23 @@ public sealed class RootlessWMSettingsTests
     }
 
     [Fact]
-    public void ToWorkspaceBarOptions_MapsSectionsAndCommandWidget()
+    public void ToWorkspaceBarOptions_MapsBarStyle()
     {
         var settings = new RootlessWMSettings(
             0,
             0,
             WorkspaceBar: new WorkspaceBarSettings(
                 Style: new WorkspaceBarStyleSettings(PaddingLeft: 8, FontSize: 11),
-                Sections: [new WorkspaceBarSectionSettings("widgets", "right")],
-                Widgets: new WorkspaceBarWidgetsSettings(
-                    Order: ["vpn"],
-                    Widgets: new Dictionary<string, WorkspaceBarWidgetSettings>
-                    {
-                        ["vpn"] = new(Kind: "command", Command: "ver", IntervalMilliseconds: 100)
-                    })));
+                ModulesLeft: ["cpu"],
+                Modules: new Dictionary<string, WorkspaceBarModuleSettings>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["cpu"] = new WorkspaceBarModuleSettings(Type: "cpu")
+                }));
 
         var options = settings.ToWorkspaceBarOptions();
 
         Assert.Equal(8, options.Style!.Padding.Left);
         Assert.Equal(11, options.Style.FontSize);
-        Assert.Single(options.Sections!);
-        Assert.Equal(WorkspaceBarSectionAlignment.Right, options.Sections!.Single().Alignment);
-        Assert.Equal("command", options.Widgets[0].Kind);
-        Assert.Equal(250, options.Widgets[0].IntervalMilliseconds);
+        Assert.Single(options.ModulesLeft!);
     }
 }

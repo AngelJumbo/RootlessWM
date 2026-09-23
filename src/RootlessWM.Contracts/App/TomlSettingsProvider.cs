@@ -226,29 +226,13 @@ internal sealed class TomlSettingsProvider
             return null;
         }
 
-        WorkspaceBarWidgetsSettings? widgets = null;
-        if (TryGetValue(table, "Widgets", out var widgetsValue))
-        {
-            widgets = widgetsValue switch
-            {
-                TomlTable widgetsTable => MapWorkspaceBarWidgets(widgetsTable),
-                TomlTableArray widgetsArray => MapWidgetArray(widgetsArray),
-                _ => null
-            };
-        }
-
         return new WorkspaceBarSettings(
             GetBool(table, "Visible") ?? true,
             (int)(GetLong(table, "Height") ?? 24),
             GetNullableLong(table, "Thickness"),
             GetString(table, "Position"),
             GetString(table, "Background") ?? "#101010",
-            MapWorkspaceBarWorkspaces(GetTable(table, "Workspaces")),
-            MapWorkspaceBarLayout(GetTable(table, "Layout")),
-            MapWorkspaceBarTitle(GetTable(table, "Title")),
-            widgets,
             MapStyle(GetTable(table, "Style") ?? table),
-            MapSections(table),
             GetStringList(table, "ModulesLeft"),
             GetStringList(table, "ModulesCenter"),
             GetStringList(table, "ModulesRight"),
@@ -290,101 +274,6 @@ internal sealed class TomlSettingsProvider
             GetString(table, "OnClick", "on-click"),
             MapStyle(table));
 
-    private static WorkspaceBarWorkspaceSettings? MapWorkspaceBarWorkspaces(TomlTable? table)
-    {
-        if (table is null)
-        {
-            return null;
-        }
-
-        return new WorkspaceBarWorkspaceSettings(
-            GetString(table, "Background") ?? "#101010",
-            GetString(table, "Color", "Foreground") ?? "#D0D0D0",
-            GetString(table, "CurrentBackground") ?? "#FFFFFF",
-            GetString(table, "CurrentColor", "CurrentForeground") ?? "#101010",
-            GetStringList(table, "Symbols"));
-    }
-
-    private static WorkspaceBarLayoutSettings? MapWorkspaceBarLayout(TomlTable? table)
-    {
-        if (table is null)
-        {
-            return null;
-        }
-
-        return new WorkspaceBarLayoutSettings(
-            GetString(table, "Background") ?? "#101010",
-            GetString(table, "Color", "Foreground") ?? "#D0D0D0",
-            GetStringMap(table, "Symbols"));
-    }
-
-    private static WorkspaceBarTitleSettings? MapWorkspaceBarTitle(TomlTable? table)
-    {
-        if (table is null)
-        {
-            return null;
-        }
-
-        return new WorkspaceBarTitleSettings(
-            GetString(table, "Background") ?? "#101010",
-            GetString(table, "CurrentBackground") ?? "#101010",
-            GetString(table, "CurrentColor", "CurrentForeground") ?? "#FFFFFF");
-    }
-
-    private static WorkspaceBarWidgetsSettings? MapWorkspaceBarWidgets(TomlTable? table)
-    {
-        if (table is null)
-        {
-            return null;
-        }
-
-        var widgets = new Dictionary<string, WorkspaceBarWidgetSettings>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (key, value) in table)
-        {
-            if (value is TomlTable widgetTable && !string.Equals(key, "Order", StringComparison.OrdinalIgnoreCase))
-            {
-                widgets[key] = MapWidget(widgetTable);
-            }
-        }
-
-        return new WorkspaceBarWidgetsSettings(GetStringList(table, "Order"), widgets);
-    }
-
-    private static WorkspaceBarWidgetsSettings MapWidgetArray(TomlTableArray array)
-    {
-        var order = new List<string>();
-        var widgets = new Dictionary<string, WorkspaceBarWidgetSettings>(StringComparer.OrdinalIgnoreCase);
-        foreach (var widgetTable in array.OfType<TomlTable>())
-        {
-            var id = GetString(widgetTable, "Id") ?? GetString(widgetTable, "Kind") ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(id))
-            {
-                continue;
-            }
-
-            order.Add(id);
-            widgets[id] = MapWidget(widgetTable);
-        }
-
-        return new WorkspaceBarWidgetsSettings(order, widgets);
-    }
-
-    private static WorkspaceBarWidgetSettings MapWidget(TomlTable table)
-    {
-        return new WorkspaceBarWidgetSettings(
-            GetBool(table, "Enabled") ?? true,
-            GetString(table, "Kind"),
-            GetString(table, "Symbol") ?? "",
-            GetString(table, "SymbolBackground", "background") ?? "#101010",
-            GetString(table, "SymbolForeground", "symbol-color") ?? "#D0D0D0",
-            GetString(table, "ResultBackground", "background") ?? "#101010",
-            GetString(table, "ResultForeground", "color") ?? "#D0D0D0",
-            GetString(table, "Text") ?? "",
-            GetString(table, "Command") ?? "",
-            (int)(GetLong(table, "IntervalMilliseconds", "interval-ms") ?? 5000),
-            MapStyle(GetTable(table, "Style") ?? table));
-    }
-
     private static WorkspaceBarStyleSettings? MapStyle(TomlTable? table)
     {
         if (table is null)
@@ -415,27 +304,10 @@ internal sealed class TomlSettingsProvider
             (float?)(GetDouble(table, "FontSize") ?? GetDouble(font, "Size")),
             GetString(table, "Weight") ?? GetString(font, "Weight"),
             GetBool(table, "Italic") ?? GetBool(font, "Italic"),
-            GetString(table, "Align") ?? "left",
             GetNullableLong(table, "MinWidth"),
             GetNullableLong(table, "MaxWidth"),
             GetBool(table, "Visible"),
             GetNullableLong(table, "MaxLength"));
-    }
-
-    private static IReadOnlyList<WorkspaceBarSectionSettings>? MapSections(TomlTable table)
-    {
-        if (!TryGetValue(table, "Sections", out var value) || value is not TomlTableArray array)
-        {
-            return null;
-        }
-
-        return array.OfType<TomlTable>()
-            .Select(section => new WorkspaceBarSectionSettings(
-                GetString(section, "Id") ?? string.Empty,
-                GetString(section, "Align") ?? "left",
-                MapStyle(GetTable(section, "Style") ?? section),
-                GetStringList(section, "Widgets")))
-            .ToList();
     }
 
     private static TomlTable? GetTable(TomlTable? table, string key)

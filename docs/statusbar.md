@@ -57,7 +57,7 @@ font = { family = "Cascadia Mono", size = 13, weight = "normal" }
 
 ## Vertical bars (`position = "left"` or `"right"`)
 
-When the bar is docked to a side edge, modules and sections stack top-to-bottom instead of left-to-right, and `modules-left`/`modules-center`/`modules-right` (or a section's `left`/`center`/`right` alignment) map to top/middle/bottom placement along that column. Text is centered across the bar's thickness.
+When the bar is docked to a side edge, modules stack top-to-bottom instead of left-to-right, and `modules-left`/`modules-center`/`modules-right` map to top/middle/bottom placement along that column. Text is centered across the bar's thickness.
 
 The `window-title` module renders one character per line in vertical bars instead of ellipsizing horizontally. Its `max-length` style option gives the maximum character count (default `24`) before the title is truncated with `...`; the same `max-length` also truncates the title in horizontal bars.
 

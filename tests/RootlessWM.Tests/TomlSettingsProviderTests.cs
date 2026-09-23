@@ -27,34 +27,17 @@ public sealed class TomlSettingsProviderTests
             Height = 28
             Background = "#202020"
 
-            [StatusBar.Workspaces]
-            Background = "#111111"
-            Foreground = "#BBBBBB"
-            CurrentBackground = "#FFFFFF"
-            CurrentForeground = "#000000"
-            Symbols = ["A", "B", "C"]
+            modules-left = ["workspaces", "cpu"]
 
-            [StatusBar.Layout]
-            Background = "#222222"
-            Foreground = "#CCCCCC"
+            [StatusBar.Style]
+            BorderWidth = 1
 
-            [StatusBar.Layout.Symbols]
-            MasterLeft = "L"
+            [module.workspaces]
+            Type = "workspaces"
 
-            [StatusBar.Title]
-            Background = "#333333"
-            CurrentBackground = "#444444"
-            CurrentForeground = "#EEEEEE"
-
-            [StatusBar.Widgets]
-            Order = ["datetime", "cpu"]
-
-            [StatusBar.Widgets.Cpu]
+            [module.cpu]
+            Type = "cpu"
             Symbol = "CPU"
-            SymbolForeground = "#FF0000"
-
-            [StatusBar.Widgets.Clock]
-            Symbol = "TIME"
 
             [Hotkeys]
             PromoteToMaster = "Alt+Shift+M"
@@ -75,41 +58,13 @@ public sealed class TomlSettingsProviderTests
         Assert.True(options.Visible);
         Assert.Equal(28, options.Height);
         Assert.Equal(ColorTranslator.FromHtml("#202020"), options.Background);
-        Assert.Equal(ColorTranslator.FromHtml("#111111"), options.Workspaces.Background);
-        Assert.Equal(["A", "B", "C"], options.Workspaces.Symbols);
-        Assert.Equal("L", options.Layout.Symbols[MasterStackLayoutMode.MasterLeft]);
-        Assert.Equal(ColorTranslator.FromHtml("#444444"), options.Title.CurrentBackground);
-        Assert.Equal(2, options.Widgets.Count);
-        Assert.Equal("datetime", options.Widgets[0].Kind);
-        Assert.Equal("TIME", options.Widgets[0].Symbol);
-        Assert.Equal("cpu", options.Widgets[1].Kind);
-        Assert.Equal(ColorTranslator.FromHtml("#FF0000"), options.Widgets[1].SymbolForeground);
-    }
-
-    [Fact]
-    public void Load_ArbitraryWidgetSubTable_IsMapped()
-    {
-        var dir = CreateTempDir();
-        var path = Path.Combine(dir, "settings.toml");
-        File.WriteAllText(path, """
-            [StatusBar.Widgets]
-            Order = ["network", "text"]
-
-            [StatusBar.Widgets.Network]
-            Symbol = "NET"
-
-            [StatusBar.Widgets.Text]
-            Text = "Hello"
-            """);
-
-        var settings = new TomlSettingsProvider(path).Load();
-        var options = settings.ToWorkspaceBarOptions();
-
-        Assert.Equal(2, options.Widgets.Count);
-        Assert.Equal("network", options.Widgets[0].Kind);
-        Assert.Equal("NET", options.Widgets[0].Symbol);
-        Assert.Equal("text", options.Widgets[1].Kind);
-        Assert.Equal("Hello", options.Widgets[1].Text);
+        Assert.Equal(1, options.Style!.BorderWidth);
+        Assert.Equal(2, options.ModulesLeft!.Count);
+        Assert.Equal("workspaces", options.ModulesLeft[0].Type);
+        Assert.Equal("cpu", options.ModulesLeft[1].Type);
+        Assert.Equal("CPU", options.ModulesLeft[1].Symbol);
+        Assert.Empty(options.ModulesCenter!);
+        Assert.Empty(options.ModulesRight!);
     }
 
     [Fact]
@@ -342,84 +297,6 @@ public sealed class TomlSettingsProviderTests
     }
 
     [Fact]
-    public void Load_SectionsNestedStyleAndCommandWidget()
-    {
-        var path = Path.Combine(CreateTempDir(), "settings.toml");
-        File.WriteAllText(path, """
-            [StatusBar.Style]
-            Color = "#EEEEEE"
-            [StatusBar.Style.Padding]
-            Left = 8
-
-            [[StatusBar.Sections]]
-            Id = "widgets"
-            Align = "right"
-
-            [StatusBar.Widgets]
-            Order = ["vpn"]
-            [StatusBar.Widgets.Vpn]
-            Kind = "command"
-            Command = "ver"
-            IntervalMilliseconds = 100
-            """);
-
-        var options = new TomlSettingsProvider(path).Load().ToWorkspaceBarOptions();
-
-        Assert.Equal(8, options.Style!.Padding.Left);
-        Assert.Equal(WorkspaceBarSectionAlignment.Right, options.Sections![0].Alignment);
-        Assert.Equal("command", options.Widgets[0].Kind);
-        Assert.Equal(250, options.Widgets[0].IntervalMilliseconds);
-    }
-
-    [Fact]
-    public void Load_RequestedDeclarativeSyntax_MapsDirectStylesAndWidgetArray()
-    {
-        var path = Path.Combine(CreateTempDir(), "settings.toml");
-        File.WriteAllText(path, """
-            [statusbar]
-            height = 28
-            background = "#1e1e2e"
-            border = { width = 1, color = "#45475a" }
-            radius = 6
-            padding = { top = 2, right = 8, bottom = 2, left = 8 }
-            spacing = 6
-            font = { family = "Cascadia Mono", size = 12, weight = "bold" }
-
-            [[statusbar.sections]]
-            id = "widgets"
-            align = "right"
-            background = "#313244"
-            padding = { left = 4, right = 4 }
-            widgets = ["cpu"]
-
-            [[statusbar.widgets]]
-            id = "cpu"
-            kind = "cpu"
-            symbol = "CPU"
-            symbol-color = "#f38ba8"
-            color = "#cdd6f4"
-            background = "#1e1e2e"
-            """);
-
-        var options = new TomlSettingsProvider(path).Load().ToWorkspaceBarOptions();
-
-        Assert.Equal(28, options.Height);
-        Assert.Equal(1, options.Style!.BorderWidth);
-        Assert.Equal(6, options.Style.BorderRadius);
-        Assert.Equal(6, options.Style.Spacing);
-        Assert.Equal("Cascadia Mono", options.Style.FontFamily);
-        Assert.Equal(12, options.Style.FontSize);
-        var widgetsSection = options.Sections!.First(section => section.Id == "widgets");
-        Assert.Equal(12, widgetsSection.Style.FontSize);
-        Assert.Equal(0, widgetsSection.Style.BorderRadius);
-        Assert.Equal(ColorTranslator.FromHtml("#313244"), widgetsSection.Style.Background);
-        var cpu = options.Widgets.First(widget => widget.Id == "cpu");
-        Assert.Equal(12, cpu.Style!.FontSize);
-        Assert.Equal(0, cpu.Style.BorderRadius);
-        Assert.Equal(ColorTranslator.FromHtml("#f38ba8"), cpu.SymbolForeground);
-    }
-
-    [Fact]
     public void Load_ModuleSyntax_MapsListsMonitorAndIndependentDefaults()
     {
         var path = Path.Combine(CreateTempDir(), "settings.toml");
@@ -456,35 +333,6 @@ public sealed class TomlSettingsProviderTests
         Assert.Equal("F", battery.BatterySymbols["batteryFull"]);
         Assert.Equal(Color.FromArgb(0, 0, 0, 0).ToArgb(), options.ModulesLeft!.Single().Style.Background.ToArgb());
         Assert.Equal(0, options.ModulesLeft!.Single().Style.Padding.All);
-    }
-
-    [Fact]
-    public void Load_ColorNaming_MapsColorAndCurrentColor()
-    {
-        var path = Path.Combine(CreateTempDir(), "settings.toml");
-        File.WriteAllText(path, """
-            [statusbar.workspaces]
-            background = "#111111"
-            color = "#222222"
-            current-background = "#333333"
-            current-color = "#444444"
-
-            [statusbar.layout]
-            background = "#555555"
-            color = "#666666"
-
-            [statusbar.title]
-            background = "#777777"
-            current-background = "#888888"
-            current-color = "#999999"
-            """);
-
-        var options = new TomlSettingsProvider(path).Load().ToWorkspaceBarOptions();
-
-        Assert.Equal(ColorTranslator.FromHtml("#222222"), options.Workspaces.Foreground);
-        Assert.Equal(ColorTranslator.FromHtml("#444444"), options.Workspaces.CurrentForeground);
-        Assert.Equal(ColorTranslator.FromHtml("#666666"), options.Layout.Foreground);
-        Assert.Equal(ColorTranslator.FromHtml("#999999"), options.Title.CurrentForeground);
     }
 
     private static string CreateTempDir()
