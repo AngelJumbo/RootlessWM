@@ -98,7 +98,8 @@ internal sealed class TomlSettingsProvider
             GetStringList(table, "ExcludedExecutables"),
             GetBool(table, "FocusFollowsMouse") ?? true,
             MapLaunchHotkeys(table),
-            MapLayouts(GetTable(table, "Layouts")));
+            MapLayouts(GetTable(table, "Layouts")),
+            GetBool(table, "DisableWindowShadows") ?? false);
     }
 
     private static LayoutsSettings? MapLayouts(TomlTable? table)

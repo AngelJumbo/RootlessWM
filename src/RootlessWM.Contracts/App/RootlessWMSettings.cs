@@ -15,7 +15,8 @@ public sealed record RootlessWMSettings(
     IReadOnlyList<string>? ExcludedExecutables = null,
     bool FocusFollowsMouse = true,
     IReadOnlyList<LaunchHotkeySettings>? Launch = null,
-    LayoutsSettings? Layouts = null)
+    LayoutsSettings? Layouts = null,
+    bool DisableWindowShadows = false)
 {
     public static RootlessWMSettings Default { get; } = new(0, 0);
 

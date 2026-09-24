@@ -13,6 +13,7 @@ RootlessWM configuration files are located at `%LOCALAPPDATA%/RootlessWM/setting
 | `toggle-explorer-behaviour` | String | `"TaskbarOnly"` | Explorer elements hidden by `ToggleExplorer`: `TaskbarOnly`, `TaskbarAndDesktopIcons`, or `TaskbarWallpaperAndDesktopIcons`. |
 | `hide-explorer-on-start` | Boolean | `false` | Hides the selected Explorer components immediately on startup. |
 | `excluded-executables` | Array of strings | `["Taskmgr"]` | Process names without `.exe` that remain floating. |
+| `disable-window-shadows` | Boolean | `false` | Disables the default Windows drop shadow on managed windows; restored when disabled or on reload. |
 
 ## Layouts
 

@@ -100,6 +100,17 @@ public sealed class TomlSettingsProviderTests
     }
 
     [Fact]
+    public void Load_DisableWindowShadows_MapsConfiguredValue()
+    {
+        var path = Path.Combine(CreateTempDir(), "settings.toml");
+        File.WriteAllText(path, "disable-window-shadows = true");
+
+        var settings = new TomlSettingsProvider(path).Load();
+
+        Assert.True(settings.DisableWindowShadows);
+    }
+
+    [Fact]
     public void Load_FocusFollowsMouse_MapsConfiguredValue()
     {
         var path = Path.Combine(CreateTempDir(), "settings.toml");

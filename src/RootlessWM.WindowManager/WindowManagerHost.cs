@@ -37,6 +37,7 @@ internal sealed class WindowManagerHost
     private readonly Win32WindowCommander _windowCommander = new();
     private readonly Win32CursorController _cursorController = new();
     private readonly ExplorerVisibilityController _explorerVisibility = new();
+    private readonly WindowShadowController _windowShadowController = new();
     private readonly MouseFocusController _mouseFocusController;
     private readonly ManagementState _managementState = new();
     private readonly IManagedWindowStateStore _windowStateStore = new JsonManagedWindowStateStore();
@@ -299,6 +300,8 @@ internal sealed class WindowManagerHost
         {
             _explorerVisibility.Toggle(_settings.ToggleExplorerBehaviour);
         }
+
+        ApplyWindowShadowSetting();
         ApplyWorkspaceVisibility();
         SaveWorkspaceState();
         using var eventSource = new WindowEventSource();
@@ -419,6 +422,7 @@ internal sealed class WindowManagerHost
                     var reloaded = LoadSettings();
                     if (_managementState.IsEnabled)
                     {
+                        ApplyWindowShadowSetting();
                         RetilePrimaryWindows();
                     }
                     return new WindowManagerResponse(reloaded, reloaded ? null : _lastSettingsError, BuildStatus());
@@ -875,6 +879,7 @@ internal sealed class WindowManagerHost
         RunUntileMode();
         _fullscreenState.Clear();
         _explorerVisibility.EnsureVisible();
+        _windowShadowController.Apply(_windowTracker.Snapshot().Select(window => window.Handle), disableShadows: false);
         _log.Info("management_disabled", new { disabled, reason = "emergency_hotkey" });
     }
 
@@ -1344,6 +1349,11 @@ internal sealed class WindowManagerHost
                 // only become eligible later via LocationChanged/Activated, so retile on the
                 // transition into the managed set regardless of event kind.
                 var newlyManaged = !wasAlreadyTracked && tracked.Eligibility == WindowEligibility.Managed;
+                if (newlyManaged && _managementState.IsEnabled && _settings.DisableWindowShadows)
+                {
+                    _windowShadowController.Suppress(windowEvent.Handle);
+                }
+
                 if (newlyManaged && !ShouldRetileFor(windowEvent.Kind))
                 {
                     _log.Info("managed_window_discovered_late", new
@@ -1379,6 +1389,14 @@ internal sealed class WindowManagerHost
         var trackedWindows = _windowTracker.Seed(windows);
         _tilingState.Synchronize(trackedWindows);
         return trackedWindows;
+    }
+
+    private void ApplyWindowShadowSetting()
+    {
+        var handles = _windowTracker.Snapshot()
+            .Where(window => window.Eligibility == WindowEligibility.Managed)
+            .Select(window => window.Handle);
+        _windowShadowController.Apply(handles, _settings.DisableWindowShadows);
     }
 
     private bool LoadSettings()

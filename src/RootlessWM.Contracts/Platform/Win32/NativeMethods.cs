@@ -84,6 +84,9 @@ internal static class NativeMethods
     internal const uint AttachParentProcess = 0xFFFFFFFF;
     internal const uint DwmwaCloaked = 14;
     internal const uint DwmwaWindowCornerPreference = 33;
+    internal const uint DwmwaNcrenderingPolicy = 2;
+    internal const uint DwmncrpUseWindowStyle = 0;
+    internal const uint DwmncrpDisabled = 1;
     internal const uint MonitorDpiTypeEffective = 0;
 
     internal static readonly nint DpiAwarenessContextPerMonitorAwareV2 = new(-4);
