@@ -17,7 +17,7 @@ AppPublisher={#AppPublisher}
 SetupIconFile=..\assets\RootlessWM.ico
 DefaultDirName={localappdata}\RootlessWM\app
 DisableProgramGroupPage=yes
-PrivilegesRequired=lowest
+PrivilegesRequired=admin
 OutputDir=..\artifacts\installer
 OutputBaseFilename=RootlessWM-Setup
 Compression=lzma2
@@ -33,17 +33,29 @@ Source: "{#ExampleSettingsPath}"; DestDir: "{localappdata}\RootlessWM"; DestName
 
 [Icons]
 Name: "{autoprograms}\RootlessWM"; Filename: "{app}\{#AppExeName}"; Parameters: "--manage --no-logs"; WorkingDir: "{app}"
-Name: "{userstartup}\RootlessWM"; Filename: "{app}\{#AppExeName}"; Parameters: "--manage --no-logs"; WorkingDir: "{app}"
 
 [InstallDelete]
 Type: files; Name: "{userstartup}\RootlessWM.lnk"
 
-[Run]
-Filename: "{app}\{#AppExeName}"; Parameters: "--manage --no-logs"; WorkingDir: "{app}"; Description: "Launch RootlessWM"; Flags: nowait postinstall skipifsilent unchecked
-
 [Code]
 const
-  ScheduledTaskName = 'RootlessWM.WindowManager';
+  ManagerTaskName = 'RootlessWM.Manager';
+  WindowManagerTaskName = 'RootlessWM.WindowManager';
+
+procedure LaunchManager();
+var
+  ResultCode: Integer;
+begin
+  ShellExec(
+    'open',
+    ExpandConstant('{sys}\schtasks.exe'),
+    '/Run /TN "' + ManagerTaskName + '"',
+    '',
+    SW_HIDE,
+    ewNoWait,
+    ResultCode
+  );
+end;
 
 function QuotePowerShellLiteral(Value: String): String;
 begin
@@ -51,24 +63,37 @@ begin
   Result := '''' + Value + '''';
 end;
 
-procedure CreateScheduledTask();
+procedure CreateScheduledTaskFor(TaskName, ExeName: String; Elevated: Boolean);
 var
   Parameters: String;
   ResultCode: Integer;
   UserName: String;
   ExePath: String;
   PowerShellCommand: String;
+  RunLevelArg: String;
+  FriendlyName: String;
 begin
+  if Elevated then
+  begin
+    RunLevelArg := '/RL HIGHEST ';
+    FriendlyName := 'elevated RootlessWM window-manager';
+  end
+  else
+  begin
+    RunLevelArg := '/RL LIMITED ';
+    FriendlyName := 'RootlessWM';
+  end;
+
   UserName := GetUserNameString();
-  ExePath := ExpandConstant('{app}\{#WindowManagerExeName}');
+  ExePath := ExpandConstant('{app}\' + ExeName);
   Parameters :=
     '/Create ' +
-    '/TN "' + ScheduledTaskName + '" ' +
+    '/TN "' + TaskName + '" ' +
     '/TR ""' + ExePath + '" --manage --no-logs" ' +
     '/SC ONLOGON ' +
     '/RU "' + UserName + '" ' +
     '/IT ' +
-    '/RL HIGHEST ' +
+    RunLevelArg +
     '/F';
 
   if not ShellExec(
@@ -81,13 +106,13 @@ begin
     ResultCode
   ) then
   begin
-    RaiseException('Unable to create the elevated RootlessWM window-manager task.');
+    RaiseException('Unable to create the ' + FriendlyName + ' task.');
   end;
 
   if ResultCode <> 0 then
   begin
     RaiseException(
-      'Unable to create the elevated RootlessWM window-manager task.' +
+      'Unable to create the ' + FriendlyName + ' task.' +
       Chr(13) + Chr(10) + Chr(13) + Chr(10) +
       'schtasks exit code: ' + IntToStr(ResultCode)
     );
@@ -101,7 +126,7 @@ begin
     '-DontStopIfGoingOnBatteries ' +
     '-MultipleInstances IgnoreNew ' +
     '-ExecutionTimeLimit ([TimeSpan]::Zero); ' +
-    'Set-ScheduledTask -TaskName ''' + ScheduledTaskName + ''' ' +
+    'Set-ScheduledTask -TaskName ''' + TaskName + ''' ' +
     '-Settings $settings"';
 
   if not ShellExec(
@@ -115,14 +140,14 @@ begin
   ) then
   begin
     RaiseException(
-      'Unable to execute PowerShell while configuring the RootlessWM startup task.'
+      'Unable to execute PowerShell while configuring the ' + FriendlyName + ' startup task.'
     );
   end;
 
   if ResultCode <> 0 then
   begin
     RaiseException(
-      'Unable to configure the RootlessWM startup task power settings.' +
+      'Unable to configure the ' + FriendlyName + ' startup task power settings.' +
       Chr(13) + Chr(10) + Chr(13) + Chr(10) +
       'PowerShell exit code: ' + IntToStr(ResultCode)
     );
@@ -130,12 +155,18 @@ begin
 
 end;
 
-procedure DeleteScheduledTask();
+procedure CreateScheduledTasks();
+begin
+  CreateScheduledTaskFor(ManagerTaskName, '{#AppExeName}', False);
+  CreateScheduledTaskFor(WindowManagerTaskName, '{#WindowManagerExeName}', True);
+end;
+
+procedure DeleteScheduledTaskNamed(TaskName: String);
 var
   Parameters: String;
   ResultCode: Integer;
 begin
-  Parameters := '/Delete /TN "' + ScheduledTaskName + '" /F';
+  Parameters := '/Delete /TN "' + TaskName + '" /F';
   if ShellExec(
     'runas',
     ExpandConstant('{sys}\schtasks.exe'),
@@ -146,15 +177,23 @@ begin
     ResultCode
   ) then
   begin
-    Log('Scheduled task removal exit code: ' + IntToStr(ResultCode));
+    Log('Scheduled task removal exit code for ' + TaskName + ': ' + IntToStr(ResultCode));
   end;
+end;
+
+procedure DeleteScheduledTasks();
+begin
+  DeleteScheduledTaskNamed(ManagerTaskName);
+  DeleteScheduledTaskNamed(WindowManagerTaskName);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
   begin
-    CreateScheduledTask();
+    CreateScheduledTasks();
+    if not WizardSilent then
+      LaunchManager();
   end;
 end;
 
@@ -162,6 +201,6 @@ procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usUninstall then
   begin
-    DeleteScheduledTask();
+    DeleteScheduledTasks();
   end;
 end;
