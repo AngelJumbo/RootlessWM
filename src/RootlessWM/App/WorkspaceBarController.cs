@@ -733,7 +733,7 @@ internal sealed class WorkspaceBarController : IDisposable
                 var itemLength = (_isVertical ? LineHeight(module.Style) : MeasureText(text, module.Style)) + 8;
                 var itemRect = MakePrimaryRect(rect, cursor, itemLength);
                 var active = index == _currentWorkspace;
-                if(active) DrawFill(canvas, itemRect, module.ActiveBackground ?? module.Style.Background , module.Style.BorderRadius);
+                if (active) DrawFill(canvas, itemRect, module.ActiveBackground ?? module.Style.Background, module.Style.BorderRadius);
                 DrawText(canvas, text, itemRect, active ? module.ActiveForeground ?? module.Style.Foreground : module.Style.Foreground, module.Style);
                 if (!string.IsNullOrEmpty(module.OnClick))
                 {
