@@ -27,7 +27,8 @@ internal sealed class WorkspaceBarWidgetRegistry
             new BatteryWidgetProvider(new BatteryMetricsSampler()),
             new DiskWidgetProvider(),
             new NetworkWidgetProvider(new NetworkMetricsSampler()),
-            new VolumeWidgetProvider(new SystemVolumeController(), log ?? new ConsoleDiagnosticLog())
+            new VolumeWidgetProvider(new SystemVolumeController(), log ?? new ConsoleDiagnosticLog()),
+            new BrightnessWidgetProvider(new ScreenBrightnessController(), log ?? new ConsoleDiagnosticLog())
         ]);
     }
 
@@ -57,6 +58,13 @@ internal sealed class WorkspaceBarWidgetRegistry
             && volumeProvider is VolumeWidgetProvider volume)
         {
             return volume.WithSymbols(options.VolumeSymbols);
+        }
+
+        if (string.Equals(key, "brightness", StringComparison.OrdinalIgnoreCase)
+            && TryGet(key, out var brightnessProvider)
+            && brightnessProvider is BrightnessWidgetProvider brightness)
+        {
+            return brightness.WithSymbols(options.BrightnessSymbols);
         }
 
         return TryGet(key, out var provider) ? provider : null;

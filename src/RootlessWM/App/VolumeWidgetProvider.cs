@@ -6,7 +6,7 @@ namespace RootlessWM.App;
 internal sealed class VolumeWidgetProvider(
     ISystemVolume volume,
     ConsoleDiagnosticLog log,
-    IReadOnlyDictionary<string, string>? symbols = null) : IWidgetProvider
+    IReadOnlyDictionary<string, string>? symbols = null) : IScrollWidgetProvider
 {
     private readonly IReadOnlyDictionary<string, string> _symbols = symbols is null
         ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)

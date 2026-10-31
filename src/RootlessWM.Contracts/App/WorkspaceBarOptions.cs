@@ -119,6 +119,7 @@ public sealed record WorkspaceBarWidgetOptions(
     public string Id { get; init; } = Kind;
     public IReadOnlyDictionary<string, string>? BatterySymbols { get; init; }
     public IReadOnlyDictionary<string, string>? VolumeSymbols { get; init; }
+    public IReadOnlyDictionary<string, string>? BrightnessSymbols { get; init; }
 }
 
 public enum WorkspaceBarModuleMonitor
@@ -146,6 +147,7 @@ public sealed record WorkspaceBarModuleOptions(
     string? OnClick = null)
 {
     public IReadOnlyDictionary<string, string>? VolumeSymbols { get; init; }
+    public IReadOnlyDictionary<string, string>? BrightnessSymbols { get; init; }
 
     public bool IsShownOn(bool isPrimary, bool isFocused)
         => Monitor == WorkspaceBarModuleMonitor.All

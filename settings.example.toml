@@ -115,7 +115,13 @@ font = { family = "Cascadia Mono", size = 13, weight = "normal" }
 # format = "{day}-{month}-{year}"
 
 # Data modules support type-specific format placeholders documented in README.md.
-# Built-in data types: datetime, uptime, battery, disk, network, and volume.
+# Built-in data types: datetime, uptime, battery, disk, network, volume, and brightness.
+# Integrated laptop brightness: add "brightness" to modules-right.
+# [module.brightness]
+# type = "brightness"
+# format = "{brightness_symbol} {percent}%"
+# symbols = { brightnessLow = "\U000F00DE", brightnessMedium = "\U000F00DF", brightnessHigh = "\U000F00E0" }
+# Requires a Nerd Font for these example glyphs.
 # Add "volume" to modules-right to enable volume display and wheel adjustment.
 # [module.volume]
 # type = "volume"

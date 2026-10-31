@@ -43,7 +43,7 @@ monitor = "primary"
 format = "CPU {percent}%"
 ```
 
-Supported module types are `workspaces`, `layout`, `window-title`, `cpu`, `memory`, `datetime`, `uptime`, `battery`, `disk`, `network`, `volume`, `text`, and `command`.
+Supported module types are `workspaces`, `layout`, `window-title`, `cpu`, `memory`, `datetime`, `uptime`, `battery`, `disk`, `network`, `volume`, `brightness`, `text`, and `command`.
 
 Text is always centered within each module, including each line of multiline text. Module groups retain their configured left, center, or right placement.
 
@@ -92,6 +92,7 @@ Any module or widget text containing a literal newline (`\n`) is rendered as mul
 | `disk` | Yes | `{output}` | `{root}`, `{used_percent}`, `{used_bytes}`, `{free_bytes}`, `{total_bytes}`, `{output}` |
 | `network` | Yes | `{output}` | `{download_bps}`, `{upload_bps}`, `{download_rate}`, `{upload_rate}`, `{output}` |
 | `volume` | Yes | `{output}` | `{volume_symbol}`, `{percent}`, `{muted}` (`true`/`false`), `{status}` (`muted` or empty), `{output}` |
+| `brightness` | Yes | `{output}` | `{brightness_symbol}`, `{percent}`, `{output}` |
 | `text` | No `format` | Literal `text` value | Configured `text`, unchanged. |
 | `command` | Yes | `{output}` | Trimmed command output. |
 
@@ -122,6 +123,24 @@ Use any glyph supported by your configured font. `volumeZero` applies at 0%, `vo
 The module displays the Windows default multimedia playback device's master volume and mute status. Left-click it to toggle mute without changing the volume level. Hover over it and scroll up to increase volume or down to decrease it, by 2 percentage points per wheel notch, limited to 0–100%. Partial wheel deltas accumulate until a full notch. Scrolling does not change mute state. Neither clicking nor scrolling activates the bar. Both interactions work in horizontal and vertical bars, including module padding; no `on-click` configuration is needed for volume.
 
 Device changes and external volume changes are reflected on the next bar refresh (normally once per second); wheel and mute changes refresh immediately. Without an available playback device, the module shows `N/A` and logs the audio error instead of showing a false volume value. In this state, `{percent}` is `N/A`, `{muted}` is `unknown`, and `{status}` is `unavailable`.
+
+## Screen Brightness
+
+Add `"brightness"` to your module list:
+
+```toml
+[module.brightness]
+type = "brightness"
+format = "{brightness_symbol} {percent}%"
+font = { family = "FiraCode Nerd Font Mono", size = 12 }
+symbols = { brightnessLow = "\U000F00DE", brightnessMedium = "\U000F00DF", brightnessHigh = "\U000F00E0" }
+```
+
+The three symbols represent 0–33%, 34–66%, and 67–100%. Keys are case-insensitive; missing symbols render empty. The example uses Nerd Font Material Design brightness 5, 6, and 7 glyphs.
+
+Hover and scroll up/down to adjust the integrated laptop screen by 2 percentage points per notch, limited to 0–100%. Partial wheel movements accumulate. Panels with discrete brightness levels advance to the next supported level in the requested direction. No click action is assigned. Bar orientation and monitor placement do not change the target: all brightness modules control the integrated display, not external monitors.
+
+Wheel changes refresh immediately; Windows/external brightness changes refresh on the next bar tick. If the display/driver does not support WMI brightness, the module displays `N/A` and logs the error. No brightness state is saved to disk.
 
 ## Inline Styling
 

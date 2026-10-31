@@ -170,7 +170,8 @@ public sealed record RootlessWMSettings(
             string.Equals(type, "battery", StringComparison.OrdinalIgnoreCase) ? module.Symbols : null,
             module.OnClick ?? DefaultModuleOnClick(type))
         {
-            VolumeSymbols = string.Equals(type, "volume", StringComparison.OrdinalIgnoreCase) ? module.Symbols : null
+            VolumeSymbols = string.Equals(type, "volume", StringComparison.OrdinalIgnoreCase) ? module.Symbols : null,
+            BrightnessSymbols = string.Equals(type, "brightness", StringComparison.OrdinalIgnoreCase) ? module.Symbols : null
         };
     }
 
@@ -185,6 +186,7 @@ public sealed record RootlessWMSettings(
             "disk" => "{output}",
             "network" => "{output}",
             "volume" => "{output}",
+            "brightness" => "{output}",
             "command" => "{output}",
             _ => null
         };

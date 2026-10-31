@@ -8,6 +8,7 @@
   <ItemGroup>
     <PackageReference Include="SkiaSharp.Views.WindowsForms" Version="2.88.9" />
     <PackageReference Include="Tomlyn" Version="2.10.1" />
+    <PackageReference Include="System.Management" Version="9.0.10" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\RootlessWM.Contracts\RootlessWM.Contracts.csproj" />

@@ -239,6 +239,7 @@ internal sealed class WorkspaceBarController : IDisposable
         private float _scale = 1F;
         private readonly List<(SKRect Rect, string Action, int Index)> _clickTargets = [];
         private readonly List<(SKRect Rect, VolumeWidgetProvider Provider)> _volumeTargets = [];
+        private readonly List<(SKRect Rect, IScrollWidgetProvider Provider)> _scrollTargets = [];
 
         // Raised when the bar's monitor DPI changes so the controller can recompute the
         // physical bounds and bitmap immediately instead of waiting for the next status refresh.
@@ -275,7 +276,7 @@ internal sealed class WorkspaceBarController : IDisposable
 
         private bool HandleMouseWheel(Point location, int delta)
         {
-            foreach (var target in _volumeTargets)
+            foreach (var target in _scrollTargets)
             {
                 if (target.Rect.Contains(location.X / _scale, location.Y / _scale))
                 {
@@ -388,7 +389,8 @@ internal sealed class WorkspaceBarController : IDisposable
             {
                 Id = module.Id,
                 BatterySymbols = module.BatterySymbols,
-                VolumeSymbols = module.VolumeSymbols
+                VolumeSymbols = module.VolumeSymbols,
+                BrightnessSymbols = module.BrightnessSymbols
             };
 
         private sealed record ModuleBinding(int Index, WorkspaceBarWidgetOptions Widget);
@@ -586,6 +588,7 @@ internal sealed class WorkspaceBarController : IDisposable
         {
             _clickTargets.Clear();
             _volumeTargets.Clear();
+            _scrollTargets.Clear();
             var barRect = new SKRect(0, 0, width, height);
             if (!_options.IndependentModules)
             {
@@ -681,11 +684,14 @@ internal sealed class WorkspaceBarController : IDisposable
                 ? new SKRect(rect.Left, rect.Top + module.Style.Margin.Top, rect.Right, rect.Bottom - module.Style.Margin.Bottom)
                 : new SKRect(rect.Left + module.Style.Margin.Left, rect.Top, rect.Right - module.Style.Margin.Right, rect.Bottom);
             DrawBox(canvas, adjusted, module.Style);
-            if (string.Equals(module.Type, "volume", StringComparison.OrdinalIgnoreCase)
-                && _moduleBindings.TryGetValue(module.Id, out var binding)
-                && GetOrCreateProvider(binding.Index, binding.Widget) is VolumeWidgetProvider volumeProvider)
+            if (_moduleBindings.TryGetValue(module.Id, out var binding)
+                && GetOrCreateProvider(binding.Index, binding.Widget) is IScrollWidgetProvider scrollProvider)
             {
-                _volumeTargets.Add((adjusted, volumeProvider));
+                _scrollTargets.Add((adjusted, scrollProvider));
+                if (scrollProvider is VolumeWidgetProvider volumeProvider)
+                {
+                    _volumeTargets.Add((adjusted, volumeProvider));
+                }
             }
 
             var content = Inset(adjusted, module.Style.Padding, module.Style.BorderWidth);
@@ -1103,7 +1109,7 @@ internal sealed class WorkspaceBarController : IDisposable
 
         private IWidgetProvider? GetOrCreateProvider(int index, WorkspaceBarWidgetOptions widget)
         {
-            var signature = $"{widget.Kind}\n{widget.Symbol}\n{widget.BatterySymbols?.Count}\n{widget.Text}\n{widget.Command}\n{widget.IntervalMilliseconds}\n{System.Text.Json.JsonSerializer.Serialize(widget.VolumeSymbols)}";
+            var signature = $"{widget.Kind}\n{widget.Symbol}\n{widget.BatterySymbols?.Count}\n{widget.Text}\n{widget.Command}\n{widget.IntervalMilliseconds}\n{System.Text.Json.JsonSerializer.Serialize(widget.VolumeSymbols)}\n{System.Text.Json.JsonSerializer.Serialize(widget.BrightnessSymbols)}";
             while (_widgetProviders.Count <= index)
             {
                 _widgetProviders.Add((string.Empty, null!));
