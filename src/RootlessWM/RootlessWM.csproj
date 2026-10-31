@@ -11,6 +11,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\RootlessWM.Contracts\RootlessWM.Contracts.csproj" />
+    <ProjectReference Include="..\RootlessWM.WindowManager\RootlessWM.WindowManager.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="RootlessWM.Tests" />

@@ -42,6 +42,12 @@ internal sealed class WmApplication
         }
 
         _log.Info("application_started", new { mode = "foundation" });
+        if (args.Any(arg => arg.Equals("--tile", StringComparison.OrdinalIgnoreCase)
+            || arg.Equals("--untile", StringComparison.OrdinalIgnoreCase)))
+        {
+            _log.Error("unsupported_command", new { reason = "standalone_tiling_removed", command = "--manage" });
+            return 1;
+        }
 
         if (args.Contains("--manage", StringComparer.OrdinalIgnoreCase))
         {

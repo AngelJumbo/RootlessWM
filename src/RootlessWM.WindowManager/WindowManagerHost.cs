@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using System.Text.Json;
 using Microsoft.Win32;
 using RootlessWM.App;
 using RootlessWM.Contracts.Messages;
@@ -39,8 +38,7 @@ internal sealed class WindowManagerHost
     private readonly ExplorerVisibilityController _explorerVisibility = new();
     private readonly MouseFocusController _mouseFocusController;
     private readonly ManagementState _managementState = new();
-    private readonly IManagedWindowStateStore _windowStateStore = new JsonManagedWindowStateStore();
-    private readonly JsonWorkspaceStateStore _workspaceStateStore = new();
+    private IReadOnlyList<ManagedWindowState> _managedWindowStates = [];
     private readonly WindowRestorer _windowRestorer = new(new GuardedWindowBoundsRestorer());
     private readonly SettingsLoader _settingsLoader = new(new TomlSettingsProvider());
     private MasterStackLayoutOptions _layoutOptions = MasterStackLayoutOptions.Default;
@@ -108,6 +106,13 @@ internal sealed class WindowManagerHost
         }
 
         _log.Info("window_manager_started", new { mode = "foundation" });
+        if (args.Any(arg => arg.Equals("--tile", StringComparison.OrdinalIgnoreCase)
+            || arg.Equals("--untile", StringComparison.OrdinalIgnoreCase)))
+        {
+            _log.Error("unsupported_command", new { reason = "standalone_tiling_removed", command = "--manage" });
+            return 1;
+        }
+
         LoadSettings();
 
         if (args.Contains("--diagnostics", StringComparer.OrdinalIgnoreCase))
@@ -145,16 +150,6 @@ internal sealed class WindowManagerHost
             RunWatchMode();
         }
 
-        if (args.Contains("--tile", StringComparer.OrdinalIgnoreCase))
-        {
-            RunTileMode();
-        }
-
-        if (args.Contains("--untile", StringComparer.OrdinalIgnoreCase))
-        {
-            RunUntileMode();
-        }
-
         if (args.Contains("--manage", StringComparer.OrdinalIgnoreCase))
         {
             RunManageMode();
@@ -164,16 +159,11 @@ internal sealed class WindowManagerHost
         return 0;
     }
 
-    private void RunTileMode()
+    private void TileManagedWindows()
     {
-        if (!TryLoadManagedWindowStates(out var pendingStates, "tiling"))
+        if (_managedWindowStates.Count > 0)
         {
-            return;
-        }
-
-        if (pendingStates.Count > 0)
-        {
-            _log.Error("tiling_blocked", new { reason = "pending_restore_exists", command = "--untile" });
+            _log.Error("tiling_blocked", new { reason = "pending_restore_exists" });
             return;
         }
 
@@ -190,7 +180,7 @@ internal sealed class WindowManagerHost
             return;
         }
 
-        _windowStateStore.Save(managedWindowStates);
+        _managedWindowStates = managedWindowStates;
         var operations = TileAllMonitors(tiledHandles);
         _log.Info("tiling_completed", new
         {
@@ -205,12 +195,9 @@ internal sealed class WindowManagerHost
         });
     }
 
-    private void RunUntileMode()
+    private void RestoreManagedWindows()
     {
-        if (!TryLoadManagedWindowStates(out var managedWindowStates, "restore"))
-        {
-            return;
-        }
+        var managedWindowStates = _managedWindowStates;
 
         if (managedWindowStates.Count == 0)
         {
@@ -223,14 +210,7 @@ internal sealed class WindowManagerHost
             .Where((_, index) => RestoreResultPolicy.RetainsForRetry(results[index]))
             .ToArray();
 
-        if (pendingStates.Length == 0)
-        {
-            _windowStateStore.Clear();
-        }
-        else
-        {
-            _windowStateStore.Save(pendingStates);
-        }
+        _managedWindowStates = pendingStates;
 
         _log.Info("restore_completed", new
         {
@@ -270,38 +250,25 @@ internal sealed class WindowManagerHost
 
     private void RunManageMode()
     {
-        if (!TryLoadManagedWindowStates(out var pendingStates, "management"))
+        if (_managedWindowStates.Count > 0)
         {
-            return;
-        }
-
-        if (pendingStates.Count > 0)
-        {
-            // A prior session likely ended without a clean exit (for example, a reboot); recover it automatically.
-            _log.Info("management_recovering", new { reason = "pending_restore_exists", pendingWindowCount = pendingStates.Count });
-            RunUntileMode();
-            if (!TryLoadManagedWindowStates(out pendingStates, "management"))
+            RestoreManagedWindows();
+            if (_managedWindowStates.Count > 0)
             {
-                return;
-            }
-
-            if (pendingStates.Count > 0)
-            {
-                _log.Error("management_blocked", new { reason = "pending_restore_exists", command = "--untile" });
+                _log.Error("management_blocked", new { reason = "pending_restore_exists" });
                 return;
             }
         }
 
         var trackedWindows = RefreshTrackedWindows();
-        LoadWorkspaceState(trackedWindows.Select(window => window.Handle));
-        RunTileMode();
+        _workspaceState.Synchronize(trackedWindows.Select(window => window.Handle));
+        TileManagedWindows();
         _ = _managementState.Enable();
         if (_settings.HideExplorerOnStart)
         {
             _explorerVisibility.Toggle(_settings.ToggleExplorerBehaviour);
         }
         ApplyWorkspaceVisibility();
-        SaveWorkspaceState();
         using var eventSource = new WindowEventSource();
         using var mouseFocusSource = new MouseFocusSource();
         using var server = new WindowManagerServer(this, _log);
@@ -344,8 +311,7 @@ internal sealed class WindowManagerHost
             _scheduleEligibilityRecheck = null;
             _requestShutdown = null;
             Console.CancelKeyPress -= cancelHandler;
-            SaveWorkspaceState();
-            RunUntileMode();
+            RestoreManagedWindows();
             _ = _managementState.Disable();
             _explorerVisibility.EnsureVisible();
         }
@@ -531,7 +497,6 @@ internal sealed class WindowManagerHost
                         && _monitorOwnership.TryGetMonitor(activeHandle, out var destinationMonitor))
                     {
                         _ = _workspaceState.MoveToCurrentWorkspace(activeHandle, destinationMonitor);
-                        SaveWorkspaceState();
                     }
 
                     ApplyWorkspaceVisibility();
@@ -575,7 +540,6 @@ internal sealed class WindowManagerHost
             if (executedOnWorkspace)
             {
                 FocusWorkspaceWindow(workspaceMonitor);
-                SaveWorkspaceState();
             }
             _log.Info("tiling_command_executed", new
             {
@@ -871,9 +835,8 @@ internal sealed class WindowManagerHost
     private void DisableManagement()
     {
         var disabled = _managementState.Disable();
-        SaveWorkspaceState();
         ClearFloatingZOrder();
-        RunUntileMode();
+        RestoreManagedWindows();
         _workspaceHiddenHandles.Clear();
         _fullscreenState.Clear();
         _explorerVisibility.EnsureVisible();
@@ -888,9 +851,8 @@ internal sealed class WindowManagerHost
             return;
         }
 
-        RunTileMode();
+        TileManagedWindows();
         ApplyWorkspaceVisibility();
-        SaveWorkspaceState();
         _log.Info("management_enabled", new { source = "hotkey" });
     }
 
@@ -1138,78 +1100,14 @@ internal sealed class WindowManagerHost
             : _workspaceState.GetCurrentWorkspace(cursorMonitor);
     }
 
-    private void LoadWorkspaceState(IEnumerable<nint> managedHandles)
-    {
-        try
-        {
-            var state = _workspaceStateStore.Load();
-            if (state is not null)
-            {
-                _workspaceState.Restore(state, managedHandles);
-            }
-            else
-            {
-                _workspaceState.Synchronize(managedHandles);
-            }
-        }
-        catch (Exception exception) when (exception is IOException or JsonException or InvalidDataException or ArgumentOutOfRangeException)
-        {
-            _workspaceState.Synchronize(managedHandles);
-            _log.Error("workspace_state_invalid", new
-            {
-                fallback = "defaults",
-                exception = exception.GetType().Name
-            });
-        }
-    }
-
-    private void SaveWorkspaceState()
-    {
-        try
-        {
-            _workspaceStateStore.Save(_workspaceState.Export());
-        }
-        catch (IOException exception)
-        {
-            _log.Error("workspace_state_save_failed", new { exception = exception.GetType().Name });
-        }
-    }
-
-    private bool TryLoadManagedWindowStates(
-        out IReadOnlyList<ManagedWindowState> states,
-        string operation)
-    {
-        try
-        {
-            states = _windowStateStore.Load();
-            return true;
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or InvalidDataException)
-        {
-            states = [];
-            _log.Error("managed_window_state_invalid", new
-            {
-                operation,
-                action = "blocked",
-                exception = exception.GetType().Name
-            });
-            return false;
-        }
-    }
-
-    private void PersistOriginalBoundsIfNeeded(TrackedWindow trackedWindow)
+    private void CaptureOriginalBoundsIfNeeded(TrackedWindow trackedWindow)
     {
         if (_monitorCatalog.GetMonitorHandle(trackedWindow.Handle) == nint.Zero)
         {
             return;
         }
 
-        var existingStates = _windowStateStore.Load();
-        var updatedStates = ManagedWindowStateSet.AddIfMissing(existingStates, trackedWindow);
-        if (!ReferenceEquals(existingStates, updatedStates))
-        {
-            _windowStateStore.Save(updatedStates);
-        }
+        _managedWindowStates = ManagedWindowStateSet.AddIfMissing(_managedWindowStates, trackedWindow);
     }
 
     private static bool ShouldRetileFor(WindowEventKind kind)
@@ -1339,7 +1237,7 @@ internal sealed class WindowManagerHost
                 _tilingState.Synchronize(_windowTracker.Snapshot());
                 if (tracked.Eligibility == WindowEligibility.Managed && _managementState.IsEnabled)
                 {
-                    PersistOriginalBoundsIfNeeded(tracked);
+                    CaptureOriginalBoundsIfNeeded(tracked);
                 }
 
                 // Windows that are cloaked or zero-sized at Shown time (e.g. Chromium browsers)

@@ -12,8 +12,6 @@ dotnet build
 dotnet test
 dotnet run --project src/RootlessWM -- --diagnostics
 dotnet run --project src/RootlessWM -- --watch
-dotnet run --project src/RootlessWM -- --tile
-dotnet run --project src/RootlessWM -- --untile
 dotnet run --project src/RootlessWM -- --manage
 dotnet run --project src/RootlessWM -- --manage --no-logs
 dotnet format --verify-no-changes
@@ -27,19 +25,19 @@ Enumerates top-level windows, classifications, and discovered monitor work areas
 
 Listens for top-level window lifecycle changes and writes structured event records to standard output. Press `Ctrl+C` to stop it. This mode tracks and classifies windows only; it does not move, resize, focus, or close any window.
 
-### `--tile`
-
-Applies independent master-and-stack layouts to currently eligible windows on every detected monitor. On a new session, the largest eligible window on each monitor becomes master. Maximized managed windows are restored before placement, and window handles are revalidated immediately before placement. This command changes window bounds.
-
-### `--untile`
-
-Restores the original bounds saved by `--tile`. State is stored at `%LOCALAPPDATA%/RootlessWM/managed-windows.json` before placement occurs. A pending restore blocks another `--tile` command until recovery completes.
-
 ### `--manage`
 
 Starts a persistent multi-monitor session, tiles windows, and restores their saved bounds when it exits. Press `Ctrl+C` to exit.
 
+`dotnet run --project src/RootlessWM -- --manage` builds both the interface and its window-manager helper. Exit any running or installed RootlessWM instance first: the interface can otherwise connect to that instance's already-running helper instead of starting the newly built one.
+
+Original window bounds and workspace assignments live only in the window-manager process's memory. No `managed-windows.json` or `workspaces.json` files are read or written. Each new process starts with fresh workspace state; crashes, forced termination, and reboots lose restore information. The standalone `--tile` and `--untile` commands have been removed; use `--manage` instead.
+
+After exiting an older version cleanly, existing state files in `%LOCALAPPDATA%/RootlessWM` can be deleted; the new version ignores them.
+
 During a managed session, moving the pointer over a visible managed window focuses it by default. Set `focus-follows-mouse = false` to disable this behavior. `Alt+Shift+Esc` disables management and immediately restores saved bounds; `Alt+Shift+R` enables management and tiles again.
+
+Locking and unlocking the workstation while management is disabled leaves window visibility unchanged. Workspace hiding resumes only when management is enabled again.
 
 ### `--no-logs`
 

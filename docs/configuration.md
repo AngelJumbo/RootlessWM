@@ -53,4 +53,4 @@ enabled = [
 
 ## Persistent State
 
-Managed workspace assignments are persisted atomically at `%LOCALAPPDATA%/RootlessWM/workspaces.json`. Each monitor starts on workspace 1 for a new managed session because native monitor handles are session-local. Only assignments for currently discovered windows are restored; stale window handles are discarded.
+Managed workspace assignments and original window bounds are kept only in memory. Each new window-manager process starts on workspace 1 with fresh assignments. Disabling and re-enabling management within the same process preserves workspace state; restarting does not. No workspace or managed-window state files are read or written, and crash/reboot recovery is not available.
