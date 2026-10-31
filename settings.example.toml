@@ -38,6 +38,8 @@ master-count = 1
 enabled = ["MasterLeft", "MasterTop", "Grid", "Fibonacci", "Dwindle", "CenteredMaster", "Monocle", "Floating"]
 
 [statusbar]
+# Show only the modules, without the global bar background, border, or Windows shadow.
+independent-modules = false
 visible = true
 # position = "top"     # "top" (default), "bottom", "left", or "right"
 height = 28

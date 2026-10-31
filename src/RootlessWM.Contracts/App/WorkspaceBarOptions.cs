@@ -11,7 +11,8 @@ public sealed record WorkspaceBarOptions(
     IReadOnlyList<WorkspaceBarModuleOptions>? ModulesLeft = null,
     IReadOnlyList<WorkspaceBarModuleOptions>? ModulesCenter = null,
     IReadOnlyList<WorkspaceBarModuleOptions>? ModulesRight = null,
-    WorkspaceBarPosition Position = WorkspaceBarPosition.Top)
+    WorkspaceBarPosition Position = WorkspaceBarPosition.Top,
+    bool IndependentModules = false)
 {
     public bool IsVertical => Position is WorkspaceBarPosition.Left or WorkspaceBarPosition.Right;
 

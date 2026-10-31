@@ -227,7 +227,6 @@ internal sealed class WorkspaceBarController : IDisposable
         private Bitmap? _renderBitmap;
         private string? _lastRenderSignature;
         private int _optionsRevision;
-        private int _appliedCornerRadius = -1;
         private Rectangle _lastBounds = Rectangle.Empty;
         private WorkspaceBarStyleOptions _barStyle = WorkspaceBarStyleOptions.Default;
         private WorkspaceBarOptions _options = WorkspaceBarOptionsDefaults.Create();
@@ -271,6 +270,7 @@ internal sealed class WorkspaceBarController : IDisposable
             };
             _form.MouseDown += HandleMouseDown;
             _form.WheelScrolled = HandleMouseWheel;
+            _form.HandleCreated += (_, _) => _form.ApplyAppearance(_options.IndependentModules, _barStyle.BorderRadius, _log);
         }
 
         private bool HandleMouseWheel(Point location, int delta)
@@ -351,6 +351,7 @@ internal sealed class WorkspaceBarController : IDisposable
             if (changed)
             {
                 RebuildOptionCaches();
+                _form.ApplyAppearance(options.IndependentModules, _barStyle.BorderRadius, _log);
             }
 
             _form.Visible = options.Visible;
@@ -463,12 +464,6 @@ internal sealed class WorkspaceBarController : IDisposable
                     expectedRightGap = margin.Right,
                     actualRightGap = workArea.Left + workArea.Width - bounds.Right
                 });
-            }
-
-            if (_form.IsHandleCreated && _appliedCornerRadius != _barStyle.BorderRadius)
-            {
-                _appliedCornerRadius = _barStyle.BorderRadius;
-                _form.ApplyCornerPreference(_barStyle.BorderRadius);
             }
 
             _currentWorkspace = currentWorkspace;
@@ -592,7 +587,10 @@ internal sealed class WorkspaceBarController : IDisposable
             _clickTargets.Clear();
             _volumeTargets.Clear();
             var barRect = new SKRect(0, 0, width, height);
-            DrawBox(canvas, barRect, _barStyle);
+            if (!_options.IndependentModules)
+            {
+                DrawBox(canvas, barRect, _barStyle);
+            }
             var content = Inset(barRect, _barStyle.Padding, _barStyle.BorderWidth);
             DrawModuleGroup(canvas, content, _options.ModulesLeft ?? [], WorkspaceBarAlignment.Left);
             DrawModuleGroup(canvas, content, _options.ModulesRight ?? [], WorkspaceBarAlignment.Right);
@@ -1175,19 +1173,26 @@ internal sealed class WorkspaceBarController : IDisposable
                 base.WndProc(ref message);
             }
 
-            public void ApplyCornerPreference(int radius)
+            public void ApplyAppearance(bool independentModules, int radius, ConsoleDiagnosticLog log)
             {
                 if (!IsHandleCreated)
                 {
                     return;
                 }
 
-                uint preference = radius > 0 ? 2U : 1U;
-                _ = NativeMethods.DwmSetWindowAttribute(
-                    Handle,
-                    NativeMethods.DwmwaWindowCornerPreference,
-                    ref preference,
-                    sizeof(uint));
+                // Transparent pixels do not suppress DWM's non-client outline and shadow.
+                SetAttribute(2, independentModules ? 1U : 0U); // DWMWA_NCRENDERING_POLICY: disabled/default
+                SetAttribute(34, independentModules ? 0xFFFFFFFEU : 0xFFFFFFFFU); // border: none/default
+                SetAttribute(NativeMethods.DwmwaWindowCornerPreference, independentModules || radius <= 0 ? 1U : 2U);
+
+                void SetAttribute(uint attribute, uint value)
+                {
+                    var result = NativeMethods.DwmSetWindowAttribute(Handle, attribute, ref value, sizeof(uint));
+                    if (result < 0)
+                    {
+                        log.Error("workspace_bar_appearance_failed", new { attribute, result, independentModules });
+                    }
+                }
             }
 
             public void UpdateLayer(Bitmap bitmap)

@@ -8,6 +8,25 @@ namespace RootlessWM.Tests;
 
 public sealed class TomlSettingsProviderTests
 {
+    [Theory]
+    [InlineData("", false)]
+    [InlineData("independent-modules = true", true)]
+    [InlineData("independent-modules = false", false)]
+    public void Load_IndependentModulesMapsToBarOptions(string setting, bool expected)
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(path, "[statusbar]\n" + setting);
+
+            Assert.Equal(expected, new TomlSettingsProvider(path).Load().ToWorkspaceBarOptions().IndependentModules);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     [Fact]
     public void Load_VolumeSymbolsPreservesGlyphsForCustomModuleId()
     {

@@ -9,6 +9,7 @@ Colors use `#RRGGBB` for opaque colors or `#RRGGBBAA` for colors with alpha (`00
 | Key | Type / Format | Description |
 | :--- | :--- | :--- |
 | `visible` | Boolean | Enables or disables the bar across all monitors. |
+| `independent-modules` | Boolean | Default `false`. Hides the global bar background, border, rounded frame, and Windows outline/shadow; modules retain their own styling. |
 | `position` | `"top"` \| `"bottom"` \| `"left"` \| `"right"` | Which monitor edge the bar docks to. Defaults to `top`. |
 | `height` | Integer (`16`–`64`) | Reserved thickness of the bar: its height when docked `top`/`bottom`, or its width when docked `left`/`right`. `thickness` is accepted as an alias for this key. |
 | `background` | Hex color | Base bar background. |
@@ -19,6 +20,15 @@ Colors use `#RRGGBB` for opaque colors or `#RRGGBBAA` for colors with alpha (`00
 | `font` | Table (`family`, `size`, `weight`) | Global text font properties. |
 
 ## Modules
+
+For visually independent modules, set:
+
+```toml
+[statusbar]
+independent-modules = true
+```
+
+This overrides global background/border drawing without changing module backgrounds, borders, or radii. Global padding, margins, spacing, group positions, and reserved tiling space remain unchanged. Works on every bar edge. Set it back to `false` to restore the configured global appearance.
 
 Use ordered module lists:
 

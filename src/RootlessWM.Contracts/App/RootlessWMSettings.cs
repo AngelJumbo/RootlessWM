@@ -124,7 +124,8 @@ public sealed record RootlessWMSettings(
             BuildModules(defaultModules ? ["workspaces", "layout"] : bar.ModulesLeft),
             BuildModules(defaultModules ? ["window-title"] : bar.ModulesCenter),
             BuildModules(defaultModules ? ["datetime"] : bar.ModulesRight),
-            position);
+            position,
+            bar.IndependentModules);
     }
 
     // Modules used when the configuration defines no [module.*] tables, so the bar still shows
@@ -326,7 +327,8 @@ public sealed record WorkspaceBarSettings(
     IReadOnlyList<string>? ModulesLeft = null,
     IReadOnlyList<string>? ModulesCenter = null,
     IReadOnlyList<string>? ModulesRight = null,
-    IReadOnlyDictionary<string, WorkspaceBarModuleSettings>? Modules = null)
+    IReadOnlyDictionary<string, WorkspaceBarModuleSettings>? Modules = null,
+    bool IndependentModules = false)
 {
     public static WorkspaceBarSettings Default { get; } = new();
 }

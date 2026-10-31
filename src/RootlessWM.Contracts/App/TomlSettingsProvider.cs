@@ -236,7 +236,8 @@ internal sealed class TomlSettingsProvider
             GetStringList(table, "ModulesLeft"),
             GetStringList(table, "ModulesCenter"),
             GetStringList(table, "ModulesRight"),
-            MapModules(moduleTable));
+            MapModules(moduleTable),
+            GetBool(table, "IndependentModules") ?? false);
     }
 
     private static IReadOnlyDictionary<string, WorkspaceBarModuleSettings>? MapModules(TomlTable? table)
