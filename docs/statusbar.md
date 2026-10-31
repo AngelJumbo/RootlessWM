@@ -35,6 +35,8 @@ format = "CPU {percent}%"
 
 Supported module types are `workspaces`, `layout`, `window-title`, `cpu`, `memory`, `datetime`, `uptime`, `battery`, `disk`, `network`, `text`, and `command`.
 
+Text is always centered within each module, including each line of multiline text. Module groups retain their configured left, center, or right placement.
+
 A module's TOML table name (the `[module.<id>]` key) and its `type` are independent, so multiple
 modules can share the same `type` with different formats and styling. For example, to show the
 time and date as two separately styled modules:

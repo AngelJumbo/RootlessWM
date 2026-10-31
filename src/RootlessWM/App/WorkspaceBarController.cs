@@ -611,7 +611,7 @@ internal sealed class WorkspaceBarController : IDisposable
                 var module = _visibleModules[index];
                 var length = Math.Min(_moduleWidths[index], Math.Max(0, PrimaryEnd(content) - start));
                 var rect = MakePrimaryRect(content, start, length);
-                DrawModule(canvas, module, rect, alignment);
+                DrawModule(canvas, module, rect);
                 start += length + _barStyle.Spacing;
             }
         }
@@ -647,7 +647,7 @@ internal sealed class WorkspaceBarController : IDisposable
             return module.Style.MaxWidth is int maxWidth ? Math.Min(length, maxWidth) : length;
         }
 
-        private void DrawModule(SKCanvas canvas, WorkspaceBarModuleOptions module, SKRect rect, WorkspaceBarAlignment alignment)
+        private void DrawModule(SKCanvas canvas, WorkspaceBarModuleOptions module, SKRect rect)
         {
             var adjusted = _isVertical
                 ? new SKRect(rect.Left, rect.Top + module.Style.Margin.Top, rect.Right, rect.Bottom - module.Style.Margin.Bottom)
@@ -660,23 +660,23 @@ internal sealed class WorkspaceBarController : IDisposable
                     DrawWorkspaces(canvas, content, module);
                     break;
                 case "layout":
-                    DrawText(canvas, GetLayoutText(module), content, module.Style.Foreground, module.Style, SKTextAlign.Center);
+                    DrawText(canvas, GetLayoutText(module), content, module.Style.Foreground, module.Style);
                     break;
                 case "window-title":
                     if (_isFocused)
                     {
                         if (_isVertical)
                         {
-                            DrawStyledText(canvas, VerticalizeWindowTitle(_focusedWindowTitle, module.Style), content, module.Style.Foreground, module.Style, SKTextAlign.Center);
+                            DrawStyledText(canvas, VerticalizeWindowTitle(_focusedWindowTitle, module.Style), content, module.Style.Foreground, module.Style);
                         }
                         else
                         {
-                            DrawText(canvas, GetModuleText(module), content, module.Style.Foreground, module.Style, alignment == WorkspaceBarAlignment.Right ? SKTextAlign.Right : SKTextAlign.Left, ellipsis: true);
+                            DrawText(canvas, GetModuleText(module), content, module.Style.Foreground, module.Style, ellipsis: true);
                         }
                     }
                     break;
                 default:
-                    DrawText(canvas, GetModuleText(module), content, module.Style.Foreground, module.Style, _isVertical ? SKTextAlign.Center : SKTextAlign.Left);
+                    DrawText(canvas, GetModuleText(module), content, module.Style.Foreground, module.Style);
                     break;
             }
         }
@@ -693,7 +693,7 @@ internal sealed class WorkspaceBarController : IDisposable
                 var itemRect = MakePrimaryRect(rect, cursor, itemLength);
                 var active = index == _currentWorkspace;
                 if(active) DrawFill(canvas, itemRect, module.ActiveBackground ?? module.Style.Background , module.Style.BorderRadius);
-                DrawText(canvas, text, itemRect, active ? module.ActiveForeground ?? module.Style.Foreground : module.Style.Foreground, module.Style, SKTextAlign.Center);
+                DrawText(canvas, text, itemRect, active ? module.ActiveForeground ?? module.Style.Foreground : module.Style.Foreground, module.Style);
                 if (!string.IsNullOrEmpty(module.OnClick))
                 {
                     _clickTargets.Add((itemRect, module.OnClick, index));
@@ -763,7 +763,7 @@ internal sealed class WorkspaceBarController : IDisposable
             canvas.DrawPath(path, paint);
         }
 
-        private static void DrawText(SKCanvas canvas, string text, SKRect rect, Color color, WorkspaceBarStyleOptions style, SKTextAlign align, bool ellipsis = false)
+        private static void DrawText(SKCanvas canvas, string text, SKRect rect, Color color, WorkspaceBarStyleOptions style, bool ellipsis = false)
         {
             if (string.IsNullOrEmpty(text) || rect.Width <= 0 || rect.Height <= 0)
             {
@@ -771,10 +771,10 @@ internal sealed class WorkspaceBarController : IDisposable
             }
 
             var styled = InlineStyleParser.Parse(text);
-            DrawStyledText(canvas, styled, rect, color, style, align, ellipsis);
+            DrawStyledText(canvas, styled, rect, color, style, ellipsis);
         }
 
-        private static void DrawStyledText(SKCanvas canvas, StyledText styled, SKRect rect, Color defaultColor, WorkspaceBarStyleOptions style, SKTextAlign align, bool ellipsis = false)
+        private static void DrawStyledText(SKCanvas canvas, StyledText styled, SKRect rect, Color defaultColor, WorkspaceBarStyleOptions style, bool ellipsis = false)
         {
             if (styled.IsEmpty || rect.Width <= 0 || rect.Height <= 0)
             {
@@ -790,12 +790,7 @@ internal sealed class WorkspaceBarController : IDisposable
             {
                 var line = targetStyled.Lines[lineIndex];
                 var lineWidth = MeasureLineWidth(line, defaultColor, style);
-                var startX = align switch
-                {
-                    SKTextAlign.Center => rect.MidX - (lineWidth / 2F),
-                    SKTextAlign.Right => rect.Right - lineWidth,
-                    _ => rect.Left
-                };
+                var startX = rect.MidX - (lineWidth / 2F);
 
                 var lineMidY = blockTop + (lineIndex * lineHeight) + (lineHeight / 2F);
                 var currentX = startX;
