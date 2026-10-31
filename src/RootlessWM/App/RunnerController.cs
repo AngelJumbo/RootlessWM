@@ -28,6 +28,11 @@ internal sealed class RunnerController : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         _settings = settings ?? RunnerSettings.Default;
+        if (_settings.Enabled)
+        {
+            _form ??= new RunnerForm(_settings, _log);
+        }
+
         _form?.ApplySettings(_settings);
     }
 
@@ -78,6 +83,12 @@ internal sealed class RunnerController : IDisposable
         private string _query = string.Empty;
         private int _selectedIndex;
         private float _scale = 1F;
+        private Task<(List<RunnerItem> Items, string? Error)>? _catalogTask;
+        private List<RunnerItem> _catalog = [];
+        private string? _sourcesSignature;
+        private string? _discoveryError;
+        private readonly System.Windows.Forms.Timer _loadingTimer = new() { Interval = 100 };
+        private readonly Dictionary<string, IconEntry> _icons = new(StringComparer.OrdinalIgnoreCase);
 
         public RunnerForm(RunnerSettings settings, ConsoleDiagnosticLog log)
         {
@@ -90,6 +101,8 @@ internal sealed class RunnerController : IDisposable
             TopMost = true;
             KeyPreview = true;
             DoubleBuffered = false;
+            _loadingTimer.Tick += (_, _) => PollBackgroundLoads();
+            StartDiscovery();
             DpiChanged += (_, _) =>
             {
                 if (SetScale(DpiHelper.GetScale(this)) && Visible)
@@ -115,6 +128,7 @@ internal sealed class RunnerController : IDisposable
         public void ApplySettings(RunnerSettings settings)
         {
             _settings = settings;
+            StartDiscovery();
             RefreshResults();
             Redraw();
         }
@@ -127,12 +141,14 @@ internal sealed class RunnerController : IDisposable
 
         public void Dismiss()
         {
+            _loadingTimer.Stop();
             Hide();
             ResetQuery();
         }
 
         public void ShowOnFocusedMonitor()
         {
+            StartDiscovery(force: true);
             var monitor = Screen.FromPoint(Cursor.Position).WorkingArea;
             _ = NativeMethods.GetCursorPos(out var cursorPosition);
             _scale = DpiHelper.GetMonitorScale(NativeMethods.MonitorFromPoint(cursorPosition, NativeMethods.MonitorDefaultToNearest));
@@ -153,6 +169,7 @@ internal sealed class RunnerController : IDisposable
                 _ => new Point(monitor.Left + (monitor.Width - width) / 2 + offsetX, monitor.Top + offsetY)
             };
             Show();
+            _loadingTimer.Start();
             Activate();
             Focus();
             Redraw();
@@ -222,12 +239,113 @@ internal sealed class RunnerController : IDisposable
 
         private void RefreshResults()
         {
-            _items = Discover(_settings)
+            ConsumeCatalog();
+            _items = _catalog
                 .Where(item => Matches(item, _query))
                 .Take(Math.Clamp(_settings.MaxResults, 1, 20))
                 .ToList();
             _selectedIndex = Math.Clamp(_selectedIndex, 0, Math.Max(0, _items.Count - 1));
             Height = CalculateHeight(Screen.FromPoint(Cursor.Position).WorkingArea.Height);
+        }
+
+        private void StartDiscovery(bool force = false)
+        {
+            var sources = _settings.Sources is { Count: > 0 } configured
+                ? configured.ToArray()
+                : ["start-menu", "app-paths", "path"];
+            var signature = string.Join("\n", sources).ToLowerInvariant();
+            if (_sourcesSignature == signature && (!force || _catalogTask is not null))
+            {
+                return;
+            }
+
+            if (_sourcesSignature != signature)
+            {
+                _catalog = [];
+            }
+
+            _sourcesSignature = signature;
+            _discoveryError = null;
+            var settings = _settings with { Sources = sources };
+            _catalogTask = Task.Run(() =>
+            {
+                var watch = Stopwatch.StartNew();
+                try
+                {
+                    var items = Discover(settings);
+                    _log.Info("runner_catalog_loaded", new { count = items.Count, elapsedMilliseconds = watch.ElapsedMilliseconds });
+                    return (items, (string?)null);
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException or Win32Exception)
+                {
+                    _log.Error("runner_catalog_failed", new { exception = exception.GetType().Name, exception.Message });
+                    return (new List<RunnerItem>(), exception.Message);
+                }
+            });
+        }
+
+        private bool ConsumeCatalog()
+        {
+            if (_catalogTask?.IsFaulted == true)
+            {
+                _discoveryError = _catalogTask.Exception!.GetBaseException().Message;
+                _log.Error("runner_catalog_failed", new { exception = _discoveryError });
+                _catalogTask = null;
+                return true;
+            }
+
+            if (_catalogTask?.IsCompletedSuccessfully != true)
+            {
+                return false;
+            }
+
+            (_catalog, _discoveryError) = _catalogTask.Result;
+            _catalogTask = null;
+            return true;
+        }
+
+        private void PollBackgroundLoads()
+        {
+            var changed = ConsumeCatalog();
+            foreach (var entry in _icons.Values)
+            {
+                if (!entry.Loaded && entry.Task.IsFaulted)
+                {
+                    _log.Error("runner_icon_failed", new { exception = entry.Task.Exception!.GetBaseException().Message });
+                    entry.Loaded = true;
+                    changed = true;
+                }
+
+                if (!entry.Loaded && entry.Task.IsCompletedSuccessfully)
+                {
+                    var bytes = entry.Task.Result;
+                    entry.Bitmap = bytes is null ? null : SKBitmap.Decode(bytes);
+                    entry.Loaded = true;
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                RefreshResults();
+                Redraw();
+            }
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _loadingTimer.Dispose();
+                foreach (var entry in _icons.Values)
+                {
+                    entry.Bitmap?.Dispose();
+                }
+
+                _icons.Clear();
+            }
+
+            base.Dispose(disposing);
         }
 
         private int CalculateHeight(int workAreaHeight)
@@ -290,7 +408,7 @@ internal sealed class RunnerController : IDisposable
 
         private void Redraw()
         {
-            if (!IsHandleCreated || Width <= 0 || Height <= 0)
+            if (!Visible || !IsHandleCreated || Width <= 0 || Height <= 0)
             {
                 return;
             }
@@ -357,7 +475,10 @@ internal sealed class RunnerController : IDisposable
             }
 
             using var statusPaint = CreateTextPaint(results.SecondaryColor, style, Math.Max(9, style.FontSize - 2));
-            canvas.DrawText(_items.Count == 0 ? "No applications found" : $"{_items.Count} applications", 20, height - 9, statusPaint);
+            var status = _catalogTask is not null ? "Loading applications..."
+                : _discoveryError is not null ? "Application discovery failed"
+                : _items.Count == 0 ? "No applications found" : $"{_items.Count} applications";
+            canvas.DrawText(status, 20, height - 9, statusPaint);
         }
 
         private static SKPaint CreateTextPaint(string color, RunnerStyleSettings style, float size)
@@ -377,28 +498,45 @@ internal sealed class RunnerController : IDisposable
             var left = row.Left + 12;
             var top = row.Top + Math.Max(0, (row.Height - size) / 2F);
             iconRight = left + size;
+            if (!_icons.TryGetValue(target, out var entry))
+            {
+                entry = new IconEntry(Task.Run(() => LoadIcon(target)));
+                _icons.Add(target, entry);
+            }
+
+            if (entry.Bitmap is not null)
+            {
+                canvas.DrawBitmap(entry.Bitmap, new SKRect(left, top, iconRight, top + size));
+            }
+        }
+
+        private byte[]? LoadIcon(string target)
+        {
             try
             {
                 using var icon = Icon.ExtractAssociatedIcon(target);
                 if (icon is null)
                 {
-                    return;
+                    return null;
                 }
 
                 using var bitmap = icon.ToBitmap();
                 using var stream = new MemoryStream();
                 bitmap.Save(stream, ImageFormat.Png);
-                stream.Position = 0;
-                using var skBitmap = SKBitmap.Decode(stream);
-                if (skBitmap is not null)
-                {
-                    canvas.DrawBitmap(skBitmap, new SKRect(left, top, iconRight, top + size));
-                }
+                return stream.ToArray();
             }
             catch (Exception exception) when (exception is ArgumentException or System.Runtime.InteropServices.ExternalException or IOException)
             {
                 _log.Info("runner_icon_skipped", new { target, reason = exception.GetType().Name });
+                return null;
             }
+        }
+
+        private sealed class IconEntry(Task<byte[]?> task)
+        {
+            public Task<byte[]?> Task { get; } = task;
+            public bool Loaded { get; set; }
+            public SKBitmap? Bitmap { get; set; }
         }
 
         private void UpdateLayer(Bitmap bitmap)

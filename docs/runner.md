@@ -13,6 +13,10 @@ RootlessWM includes a rofi-style application runner. Press `Alt+P` during a `--m
 - Accepts a typed executable, command, or URL when no discovered result is selected.
 - Supports configurable position, dimensions, fonts, borders, colors, transparency, row height, and icons.
 
+Application discovery starts in the background when runner settings are first applied. Typing filters an in-memory catalog instead of rescanning directories and the registry on every keypress. Reopening the runner refreshes the catalog in the background while retaining existing results; changing its sources rebuilds it. During initial loading, the runner shows `Loading applications...` and preserves typed input until results arrive. Discovery failures are logged and displayed explicitly.
+
+Associated icons are loaded asynchronously and cached in memory for the runner's lifetime. Rows appear immediately; icons fill in when ready. Closing RootlessWM releases the cached images. No runner cache files are written.
+
 ## Configuration (`[runner]`)
 
 | Sub-table | Key | Default / Format | Description |
