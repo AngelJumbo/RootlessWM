@@ -24,6 +24,8 @@ public sealed class WorkspaceBarWidgetRegistryTests
         Assert.True(registry.TryGet("battery", out _));
         Assert.True(registry.TryGet("disk", out _));
         Assert.True(registry.TryGet("network", out _));
+        Assert.True(registry.TryGet("volume", out var volume));
+        Assert.IsType<VolumeWidgetProvider>(volume);
     }
 
     [Fact]

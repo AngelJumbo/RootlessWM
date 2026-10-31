@@ -180,6 +180,7 @@ public sealed record RootlessWMSettings(
             "battery" => "{output}",
             "disk" => "{output}",
             "network" => "{output}",
+            "volume" => "{output}",
             "command" => "{output}",
             _ => null
         };
@@ -442,4 +443,3 @@ public sealed record RunnerIconsSettings(
 {
     public static RunnerIconsSettings Default { get; } = new();
 }
-

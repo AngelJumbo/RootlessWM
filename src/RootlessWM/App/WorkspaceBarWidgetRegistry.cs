@@ -15,7 +15,7 @@ internal sealed class WorkspaceBarWidgetRegistry
             StringComparer.OrdinalIgnoreCase);
     }
 
-    public static WorkspaceBarWidgetRegistry CreateDefault()
+    public static WorkspaceBarWidgetRegistry CreateDefault(ConsoleDiagnosticLog? log = null)
     {
         var metricsSampler = new SystemMetricsSampler();
         return new WorkspaceBarWidgetRegistry(
@@ -26,7 +26,8 @@ internal sealed class WorkspaceBarWidgetRegistry
             new UptimeWidgetProvider(),
             new BatteryWidgetProvider(new BatteryMetricsSampler()),
             new DiskWidgetProvider(),
-            new NetworkWidgetProvider(new NetworkMetricsSampler())
+            new NetworkWidgetProvider(new NetworkMetricsSampler()),
+            new VolumeWidgetProvider(new SystemVolumeController(), log ?? new ConsoleDiagnosticLog())
         ]);
     }
 

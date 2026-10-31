@@ -33,7 +33,7 @@ monitor = "primary"
 format = "CPU {percent}%"
 ```
 
-Supported module types are `workspaces`, `layout`, `window-title`, `cpu`, `memory`, `datetime`, `uptime`, `battery`, `disk`, `network`, `text`, and `command`.
+Supported module types are `workspaces`, `layout`, `window-title`, `cpu`, `memory`, `datetime`, `uptime`, `battery`, `disk`, `network`, `volume`, `text`, and `command`.
 
 Text is always centered within each module, including each line of multiline text. Module groups retain their configured left, center, or right placement.
 
@@ -81,10 +81,26 @@ Any module or widget text containing a literal newline (`\n`) is rendered as mul
 | `battery` | Yes | `{percent}%{charging}` | `{percent}`, `{battery_symbol}`, `{charging}`, `{ac_status}`. Empty when no battery exists. |
 | `disk` | Yes | `{output}` | `{root}`, `{used_percent}`, `{used_bytes}`, `{free_bytes}`, `{total_bytes}`, `{output}` |
 | `network` | Yes | `{output}` | `{download_bps}`, `{upload_bps}`, `{download_rate}`, `{upload_rate}`, `{output}` |
+| `volume` | Yes | `{output}` | `{percent}`, `{muted}` (`true`/`false`), `{status}` (`muted` or empty), `{output}` |
 | `text` | No `format` | Literal `text` value | Configured `text`, unchanged. |
 | `command` | Yes | `{output}` | Trimmed command output. |
 
 For `battery`, `symbols` configures state glyphs and `charging` configures the charging glyph. The default charging glyph is `⚡`. Numeric values use invariant formatting. Unknown placeholders remain unchanged.
+
+## System Volume
+
+Add `"volume"` to a module list and configure it like any other module:
+
+```toml
+# Add "volume" to your existing modules-right list.
+[module.volume]
+type = "volume"
+format = "VOL {output}"
+```
+
+The module displays the Windows default multimedia playback device's master volume and mute status. Left-click it to toggle mute without changing the volume level. Hover over it and scroll up to increase volume or down to decrease it, by 2 percentage points per wheel notch, limited to 0–100%. Partial wheel deltas accumulate until a full notch. Scrolling does not change mute state. Neither clicking nor scrolling activates the bar. Both interactions work in horizontal and vertical bars, including module padding; no `on-click` configuration is needed for volume.
+
+Device changes and external volume changes are reflected on the next bar refresh (normally once per second); wheel and mute changes refresh immediately. Without an available playback device, the module shows `N/A` and logs the audio error instead of showing a false volume value. In this state, `{percent}` is `N/A`, `{muted}` is `unknown`, and `{status}` is `unavailable`.
 
 ## Inline Styling
 

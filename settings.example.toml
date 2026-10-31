@@ -113,7 +113,11 @@ font = { family = "Cascadia Mono", size = 13, weight = "normal" }
 # format = "{day}-{month}-{year}"
 
 # Data modules support type-specific format placeholders documented in README.md.
-# Built-in data types: datetime, uptime, battery, disk, and network.
+# Built-in data types: datetime, uptime, battery, disk, network, and volume.
+# Add "volume" to modules-right to enable volume display and wheel adjustment.
+# [module.volume]
+# type = "volume"
+# format = "VOL {output}"
 # Battery symbols can represent charge state and charging.
 # [module.battery]
 # type = "battery"

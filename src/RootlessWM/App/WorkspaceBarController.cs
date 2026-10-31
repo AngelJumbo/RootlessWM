@@ -14,7 +14,7 @@ internal sealed class WorkspaceBarController : IDisposable
     private readonly Func<nint> _getFocusedMonitorHandle;
     private readonly Func<string> _getFocusedWindowTitle;
     private readonly ConsoleDiagnosticLog _log;
-    private readonly WorkspaceBarWidgetRegistry _widgetRegistry = WorkspaceBarWidgetRegistry.CreateDefault();
+    private readonly WorkspaceBarWidgetRegistry _widgetRegistry;
     private readonly System.Windows.Forms.Timer _widgetsTimer;
     private readonly HashSet<nint> _fullscreenMonitors = [];
     private readonly Dictionary<nint, HashSet<int>> _hiddenWorkspaces = [];
@@ -41,6 +41,7 @@ internal sealed class WorkspaceBarController : IDisposable
         _getFocusedMonitorHandle = getFocusedMonitorHandle;
         _getFocusedWindowTitle = getFocusedWindowTitle;
         _log = log ?? new ConsoleDiagnosticLog();
+        _widgetRegistry = WorkspaceBarWidgetRegistry.CreateDefault(_log);
         _widgetsTimer = new System.Windows.Forms.Timer { Interval = 1000 };
         _widgetsTimer.Tick += (_, _) => RefreshWidgets();
         _widgetsTimer.Start();
@@ -238,6 +239,7 @@ internal sealed class WorkspaceBarController : IDisposable
         private string _focusedWindowTitle = string.Empty;
         private float _scale = 1F;
         private readonly List<(SKRect Rect, string Action, int Index)> _clickTargets = [];
+        private readonly List<(SKRect Rect, VolumeWidgetProvider Provider)> _volumeTargets = [];
 
         // Raised when the bar's monitor DPI changes so the controller can recompute the
         // physical bounds and bitmap immediately instead of waiting for the next status refresh.
@@ -268,6 +270,22 @@ internal sealed class WorkspaceBarController : IDisposable
                 }
             };
             _form.MouseDown += HandleMouseDown;
+            _form.WheelScrolled = HandleMouseWheel;
+        }
+
+        private bool HandleMouseWheel(Point location, int delta)
+        {
+            foreach (var target in _volumeTargets)
+            {
+                if (target.Rect.Contains(location.X / _scale, location.Y / _scale))
+                {
+                    target.Provider.Scroll(delta);
+                    Redraw();
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         // Mouse coordinates arrive in physical pixels; the click targets recorded during Draw()
@@ -275,13 +293,23 @@ internal sealed class WorkspaceBarController : IDisposable
         // transform applied in Redraw(). Dividing by _scale keeps hit-testing correct across DPIs.
         private void HandleMouseDown(object? sender, MouseEventArgs e)
         {
-            if (e.Button != MouseButtons.Left || _clickTargets.Count == 0)
+            if (e.Button != MouseButtons.Left)
             {
                 return;
             }
 
             var x = e.X / _scale;
             var y = e.Y / _scale;
+            foreach (var target in _volumeTargets)
+            {
+                if (target.Rect.Contains(x, y))
+                {
+                    target.Provider.ToggleMute();
+                    Redraw();
+                    return;
+                }
+            }
+
             foreach (var target in _clickTargets)
             {
                 if (target.Rect.Contains(x, y))
@@ -561,6 +589,7 @@ internal sealed class WorkspaceBarController : IDisposable
         private void Draw(SKCanvas canvas, float width, float height)
         {
             _clickTargets.Clear();
+            _volumeTargets.Clear();
             var barRect = new SKRect(0, 0, width, height);
             DrawBox(canvas, barRect, _barStyle);
             var content = Inset(barRect, _barStyle.Padding, _barStyle.BorderWidth);
@@ -653,6 +682,13 @@ internal sealed class WorkspaceBarController : IDisposable
                 ? new SKRect(rect.Left, rect.Top + module.Style.Margin.Top, rect.Right, rect.Bottom - module.Style.Margin.Bottom)
                 : new SKRect(rect.Left + module.Style.Margin.Left, rect.Top, rect.Right - module.Style.Margin.Right, rect.Bottom);
             DrawBox(canvas, adjusted, module.Style);
+            if (string.Equals(module.Type, "volume", StringComparison.OrdinalIgnoreCase)
+                && _moduleBindings.TryGetValue(module.Id, out var binding)
+                && GetOrCreateProvider(binding.Index, binding.Widget) is VolumeWidgetProvider volumeProvider)
+            {
+                _volumeTargets.Add((adjusted, volumeProvider));
+            }
+
             var content = Inset(adjusted, module.Style.Padding, module.Style.BorderWidth);
             switch (module.Type.ToLowerInvariant())
             {
@@ -1116,7 +1152,27 @@ internal sealed class WorkspaceBarController : IDisposable
 
         private sealed class WorkspaceBarForm : Form
         {
+            public Func<Point, int, bool>? WheelScrolled;
+
             protected override bool ShowWithoutActivation => true;
+
+            protected override void WndProc(ref Message message)
+            {
+                const int wmMouseWheel = 0x020A;
+                if (message.Msg == wmMouseWheel)
+                {
+                    var coordinates = message.LParam.ToInt64();
+                    var location = PointToClient(new Point(unchecked((short)coordinates), unchecked((short)(coordinates >> 16))));
+                    var delta = unchecked((short)(message.WParam.ToInt64() >> 16));
+                    if (WheelScrolled?.Invoke(location, delta) == true)
+                    {
+                        message.Result = nint.Zero;
+                        return;
+                    }
+                }
+
+                base.WndProc(ref message);
+            }
 
             public void ApplyCornerPreference(int radius)
             {
