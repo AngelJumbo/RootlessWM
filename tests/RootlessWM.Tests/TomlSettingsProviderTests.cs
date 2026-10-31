@@ -8,6 +8,31 @@ namespace RootlessWM.Tests;
 
 public sealed class TomlSettingsProviderTests
 {
+    [Fact]
+    public void Load_BrightnessSymbolsForCustomModuleId()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(path, """
+                [statusbar]
+                modules-right = ["screen"]
+                [module.screen]
+                type = "brightness"
+                symbols = { brightnessLow = "\U000F00DE", brightnessMedium = "\U000F00DF", brightnessHigh = "\U000F00E0" }
+                """);
+            var module = Assert.Single(new TomlSettingsProvider(path).Load().ToWorkspaceBarOptions().ModulesRight!);
+            Assert.Equal("{output}", module.Format);
+            Assert.NotNull(module.BrightnessSymbols);
+            Assert.Equal("\U000F00DE", module.BrightnessSymbols["brightnessLow"]);
+            Assert.Equal(3, module.BrightnessSymbols.Count);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     [Theory]
     [InlineData("", false)]
     [InlineData("independent-modules = true", true)]
