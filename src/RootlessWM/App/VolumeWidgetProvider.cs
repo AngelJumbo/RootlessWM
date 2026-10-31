@@ -3,12 +3,21 @@ using System.Runtime.InteropServices;
 
 namespace RootlessWM.App;
 
-internal sealed class VolumeWidgetProvider(ISystemVolume volume, ConsoleDiagnosticLog log) : IWidgetProvider
+internal sealed class VolumeWidgetProvider(
+    ISystemVolume volume,
+    ConsoleDiagnosticLog log,
+    IReadOnlyDictionary<string, string>? symbols = null) : IWidgetProvider
 {
+    private readonly IReadOnlyDictionary<string, string> _symbols = symbols is null
+        ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        : new Dictionary<string, string>(symbols, StringComparer.OrdinalIgnoreCase);
     private int _wheelDelta;
     private int? _lastError;
 
     public string Key => "volume";
+
+    public VolumeWidgetProvider WithSymbols(IReadOnlyDictionary<string, string>? configuredSymbols)
+        => new(volume, log, configuredSymbols);
 
     public string GetText() => GetValues()["output"];
 
@@ -18,12 +27,14 @@ internal sealed class VolumeWidgetProvider(ISystemVolume volume, ConsoleDiagnost
         {
             var state = volume.Sample();
             _lastError = null;
-            var percent = Math.Round(state.Scalar * 100, MidpointRounding.AwayFromZero).ToString(CultureInfo.InvariantCulture);
+            var roundedPercent = (int)Math.Round(state.Scalar * 100, MidpointRounding.AwayFromZero);
+            var percent = roundedPercent.ToString(CultureInfo.InvariantCulture);
             return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 ["percent"] = percent,
                 ["muted"] = state.Muted ? "true" : "false",
                 ["status"] = state.Muted ? "muted" : "",
+                ["volume_symbol"] = GetSymbol(roundedPercent, state.Muted),
                 ["output"] = state.Muted ? $"{percent}% (muted)" : $"{percent}%"
             };
         }
@@ -35,9 +46,23 @@ internal sealed class VolumeWidgetProvider(ISystemVolume volume, ConsoleDiagnost
                 ["percent"] = "N/A",
                 ["muted"] = "unknown",
                 ["status"] = "unavailable",
+                ["volume_symbol"] = "",
                 ["output"] = "N/A"
             };
         }
+    }
+
+    private string GetSymbol(int percent, bool muted)
+    {
+        var key = muted ? "muted" : percent switch
+        {
+            0 => "volumeZero",
+            <= 33 => "volumeLow",
+            <= 66 => "volumeMedium",
+            _ => "volumeHigh"
+        };
+
+        return _symbols.TryGetValue(key, out var symbol) ? symbol : string.Empty;
     }
 
     public void Scroll(int delta)

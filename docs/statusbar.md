@@ -81,7 +81,7 @@ Any module or widget text containing a literal newline (`\n`) is rendered as mul
 | `battery` | Yes | `{percent}%{charging}` | `{percent}`, `{battery_symbol}`, `{charging}`, `{ac_status}`. Empty when no battery exists. |
 | `disk` | Yes | `{output}` | `{root}`, `{used_percent}`, `{used_bytes}`, `{free_bytes}`, `{total_bytes}`, `{output}` |
 | `network` | Yes | `{output}` | `{download_bps}`, `{upload_bps}`, `{download_rate}`, `{upload_rate}`, `{output}` |
-| `volume` | Yes | `{output}` | `{percent}`, `{muted}` (`true`/`false`), `{status}` (`muted` or empty), `{output}` |
+| `volume` | Yes | `{output}` | `{volume_symbol}`, `{percent}`, `{muted}` (`true`/`false`), `{status}` (`muted` or empty), `{output}` |
 | `text` | No `format` | Literal `text` value | Configured `text`, unchanged. |
 | `command` | Yes | `{output}` | Trimmed command output. |
 
@@ -97,6 +97,17 @@ Add `"volume"` to a module list and configure it like any other module:
 type = "volume"
 format = "VOL {output}"
 ```
+
+Configure `symbols` to select a glyph through the single `{volume_symbol}` placeholder:
+
+```toml
+[module.volume]
+type = "volume"
+format = "{volume_symbol} {percent}%"
+symbols = { volumeZero = "\U0001F508", volumeLow = "\U0001F508", volumeMedium = "\U0001F509", volumeHigh = "\U0001F50A", muted = "\U0001F507" }
+```
+
+Use any glyph supported by your configured font. `volumeZero` applies at 0%, `volumeLow` at 1–33%, `volumeMedium` at 34–66%, and `volumeHigh` at 67–100%, using the displayed rounded percentage. `muted` overrides every percentage range. Symbol keys are case-insensitive. Missing symbols (or no playback device) produce an empty `{volume_symbol}`; existing `{output}` text is unchanged. Separate volume modules can configure different glyphs.
 
 The module displays the Windows default multimedia playback device's master volume and mute status. Left-click it to toggle mute without changing the volume level. Hover over it and scroll up to increase volume or down to decrease it, by 2 percentage points per wheel notch, limited to 0–100%. Partial wheel deltas accumulate until a full notch. Scrolling does not change mute state. Neither clicking nor scrolling activates the bar. Both interactions work in horizontal and vertical bars, including module padding; no `on-click` configuration is needed for volume.
 

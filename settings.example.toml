@@ -118,6 +118,9 @@ font = { family = "Cascadia Mono", size = 13, weight = "normal" }
 # [module.volume]
 # type = "volume"
 # format = "VOL {output}"
+# Or use one placeholder for percentage-based and muted glyphs:
+# format = "{volume_symbol} {percent}%"
+# symbols = { volumeZero = "0", volumeLow = "L", volumeMedium = "M", volumeHigh = "H", muted = "X" }
 # Battery symbols can represent charge state and charging.
 # [module.battery]
 # type = "battery"

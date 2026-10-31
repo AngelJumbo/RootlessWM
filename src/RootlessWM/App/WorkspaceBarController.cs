@@ -386,7 +386,8 @@ internal sealed class WorkspaceBarController : IDisposable
                 module.Style)
             {
                 Id = module.Id,
-                BatterySymbols = module.BatterySymbols
+                BatterySymbols = module.BatterySymbols,
+                VolumeSymbols = module.VolumeSymbols
             };
 
         private sealed record ModuleBinding(int Index, WorkspaceBarWidgetOptions Widget);
@@ -1104,7 +1105,7 @@ internal sealed class WorkspaceBarController : IDisposable
 
         private IWidgetProvider? GetOrCreateProvider(int index, WorkspaceBarWidgetOptions widget)
         {
-            var signature = $"{widget.Kind}\n{widget.Symbol}\n{widget.BatterySymbols?.Count}\n{widget.Text}\n{widget.Command}\n{widget.IntervalMilliseconds}";
+            var signature = $"{widget.Kind}\n{widget.Symbol}\n{widget.BatterySymbols?.Count}\n{widget.Text}\n{widget.Command}\n{widget.IntervalMilliseconds}\n{System.Text.Json.JsonSerializer.Serialize(widget.VolumeSymbols)}";
             while (_widgetProviders.Count <= index)
             {
                 _widgetProviders.Add((string.Empty, null!));

@@ -167,7 +167,10 @@ public sealed record RootlessWMSettings(
             module.ActiveBackground is null ? null : ParseColor(module.ActiveBackground, nameof(module.ActiveBackground)),
             module.ActiveForeground is null ? null : ParseColor(module.ActiveForeground, nameof(module.ActiveForeground)),
             string.Equals(type, "battery", StringComparison.OrdinalIgnoreCase) ? module.Symbols : null,
-            module.OnClick ?? DefaultModuleOnClick(type));
+            module.OnClick ?? DefaultModuleOnClick(type))
+        {
+            VolumeSymbols = string.Equals(type, "volume", StringComparison.OrdinalIgnoreCase) ? module.Symbols : null
+        };
     }
 
     private static string? DefaultModuleFormat(string type)

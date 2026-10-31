@@ -9,6 +9,38 @@ namespace RootlessWM.Tests;
 public sealed class TomlSettingsProviderTests
 {
     [Fact]
+    public void Load_VolumeSymbolsPreservesGlyphsForCustomModuleId()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(path, """
+                [statusbar]
+                modules-right = ["sound"]
+
+                [module.sound]
+                type = "volume"
+                format = "{volume_symbol} {percent}%"
+                symbols = { volumeZero = "\U0001F508", volumeLow = "L", volumeMedium = "M", volumeHigh = "H", muted = "\U0001F507" }
+                """);
+
+            var module = Assert.Single(new TomlSettingsProvider(path).Load().ToWorkspaceBarOptions().ModulesRight!);
+
+            Assert.Equal("sound", module.Id);
+            Assert.Equal("{volume_symbol} {percent}%", module.Format);
+            Assert.NotNull(module.VolumeSymbols);
+            Assert.Equal(5, module.VolumeSymbols.Count);
+            Assert.Equal("\U0001F508", module.VolumeSymbols["volumeZero"]);
+            Assert.Equal("\U0001F507", module.VolumeSymbols["muted"]);
+            Assert.Null(module.BatterySymbols);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void Load_ValidToml_ReturnsConfiguredValues()
     {
         var dir = CreateTempDir();

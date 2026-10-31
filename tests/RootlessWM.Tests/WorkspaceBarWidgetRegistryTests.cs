@@ -6,6 +6,31 @@ namespace RootlessWM.Tests;
 public sealed class WorkspaceBarWidgetRegistryTests
 {
     [Fact]
+    public void Create_VolumeWidgetsKeepSymbolsIndependent()
+    {
+        var volume = new VolumeWidgetProviderTests.FakeVolume { State = new(0.5F, false) };
+        var registry = new WorkspaceBarWidgetRegistry(
+            [new VolumeWidgetProvider(volume, new ConsoleDiagnosticLog(writeToFile: false))]);
+        var options = new WorkspaceBarWidgetOptions("volume", "", default, default, default, default)
+        {
+            VolumeSymbols = new Dictionary<string, string> { ["volumeMedium"] = "A" }
+        };
+        var first = Assert.IsType<VolumeWidgetProvider>(registry.Create("volume", options));
+        var second = Assert.IsType<VolumeWidgetProvider>(registry.Create("VOLUME", options with
+        {
+            VolumeSymbols = new Dictionary<string, string> { ["volumeMedium"] = "B" }
+        }));
+
+        Assert.Equal("A", first.GetValues()["volume_symbol"]);
+        Assert.Equal("B", second.GetValues()["volume_symbol"]);
+        second.ToggleMute();
+        Assert.True(volume.State.Muted);
+        second.Scroll(120);
+        Assert.Equal(0.52F, volume.State.Scalar, 5);
+        Assert.True(volume.State.Muted);
+    }
+
+    [Fact]
     public void CreateDefault_ContainsCpuMemoryDateTime()
     {
         var registry = WorkspaceBarWidgetRegistry.CreateDefault();

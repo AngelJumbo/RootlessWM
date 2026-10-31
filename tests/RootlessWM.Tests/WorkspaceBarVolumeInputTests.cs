@@ -10,6 +10,37 @@ namespace RootlessWM.Tests;
 
 public sealed class WorkspaceBarVolumeInputTests
 {
+    [Fact]
+    public void VolumeSymbols_ArePassedToProviderAndReloadWhenOnlyGlyphChanges()
+    {
+        var volume = new VolumeWidgetProviderTests.FakeVolume { State = new(0.5F, false) };
+        var log = new ConsoleDiagnosticLog(writeToFile: false);
+        var registry = new WorkspaceBarWidgetRegistry([new VolumeWidgetProvider(volume, log)]);
+        var viewType = typeof(WorkspaceBarController).GetNestedType("WorkspaceBarView", BindingFlags.NonPublic);
+        Assert.NotNull(viewType);
+        using var view = Assert.IsAssignableFrom<IDisposable>(Activator.CreateInstance(viewType, [9, registry, log]));
+        var module = new WorkspaceBarModuleOptions("sound", "volume", WorkspaceBarModuleMonitor.All,
+            WorkspaceBarStyleOptions.Default, Format: "{volume_symbol} {percent}%")
+        {
+            VolumeSymbols = new Dictionary<string, string> { ["volumeMedium"] = "A" }
+        };
+        var options = new WorkspaceBarOptions(false, 40, Color.Transparent, ModulesRight: [module]);
+        var apply = viewType.GetMethod("ApplyOptions");
+        var resolve = viewType.GetMethod("ResolveModuleText", BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.NotNull(apply);
+        Assert.NotNull(resolve);
+        apply.Invoke(view, [options]);
+        Assert.Equal("A 50%", resolve.Invoke(view, [module]));
+
+        var updated = module with
+        {
+            VolumeSymbols = new Dictionary<string, string> { ["volumeMedium"] = "B" }
+        };
+        apply.Invoke(view, [options with { ModulesRight = [updated] }]);
+
+        Assert.Equal("B 50%", resolve.Invoke(view, [updated]));
+    }
+
     [Theory]
     [InlineData(false, 1F)]
     [InlineData(false, 1.5F)]

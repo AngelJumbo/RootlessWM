@@ -52,6 +52,13 @@ internal sealed class WorkspaceBarWidgetRegistry
             return new BatteryWidgetProvider(new BatteryMetricsSampler(), options.Symbol, options.BatterySymbols);
         }
 
+        if (string.Equals(key, "volume", StringComparison.OrdinalIgnoreCase)
+            && TryGet(key, out var volumeProvider)
+            && volumeProvider is VolumeWidgetProvider volume)
+        {
+            return volume.WithSymbols(options.VolumeSymbols);
+        }
+
         return TryGet(key, out var provider) ? provider : null;
     }
 }

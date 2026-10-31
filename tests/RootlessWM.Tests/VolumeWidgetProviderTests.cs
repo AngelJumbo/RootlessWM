@@ -8,6 +8,74 @@ namespace RootlessWM.Tests;
 public sealed class VolumeWidgetProviderTests
 {
     [Theory]
+    [InlineData(0, false, "Z")]
+    [InlineData(1, false, "L")]
+    [InlineData(33, false, "L")]
+    [InlineData(34, false, "M")]
+    [InlineData(66, false, "M")]
+    [InlineData(67, false, "H")]
+    [InlineData(100, false, "H")]
+    [InlineData(0, true, "X")]
+    [InlineData(33, true, "X")]
+    [InlineData(66, true, "X")]
+    [InlineData(100, true, "X")]
+    public void GetValues_SelectsSymbolForPercentageAndMute(int percent, bool muted, string expected)
+    {
+        var volume = new FakeVolume { State = new(percent / 100F, muted) };
+        var provider = new VolumeWidgetProvider(volume, new ConsoleDiagnosticLog(writeToFile: false),
+            new Dictionary<string, string>
+            {
+                ["volumeZero"] = "Z",
+                ["volumeLow"] = "L",
+                ["volumeMedium"] = "M",
+                ["volumeHigh"] = "H",
+                ["MUTED"] = "X"
+            });
+
+        var values = provider.GetValues();
+
+        Assert.Equal(expected, values["volume_symbol"]);
+        Assert.Equal($"{expected} {percent}%", WorkspaceBarFormat.Format("volume", "{volume_symbol} {percent}%", values));
+    }
+
+    [Fact]
+    public void GetValues_UsesRoundedPercentageAndUpdatesAfterInteractions()
+    {
+        var volume = new FakeVolume { State = new(0.334F, false) };
+        var provider = CreateProvider(volume).WithSymbols(new Dictionary<string, string>
+        {
+            ["volumeLow"] = "L",
+            ["volumeMedium"] = "M",
+            ["muted"] = "X"
+        });
+
+        Assert.Equal("L", provider.GetValues()["volume_symbol"]);
+        volume.State = new(0.336F, false);
+        Assert.Equal("34", provider.GetValues()["percent"]);
+        Assert.Equal("M", provider.GetValues()["volume_symbol"]);
+        provider.Scroll(-120);
+        Assert.Equal("L", provider.GetValues()["volume_symbol"]);
+        provider.ToggleMute();
+        Assert.Equal("X", provider.GetValues()["volume_symbol"]);
+        provider.ToggleMute();
+        Assert.Equal("L", provider.GetValues()["volume_symbol"]);
+    }
+
+    [Fact]
+    public void GetValues_MissingSymbolsAndUnavailableDeviceReturnEmptySymbol()
+    {
+        var volume = new FakeVolume { State = new(0.5F, false) };
+        var provider = CreateProvider(volume);
+        Assert.Equal("", provider.GetValues()["volume_symbol"]);
+        provider = provider.WithSymbols(new Dictionary<string, string> { ["volumeHigh"] = "H" });
+        Assert.Equal("", provider.GetValues()["volume_symbol"]);
+        volume.State = new(1F, true);
+        Assert.Equal("", provider.GetValues()["volume_symbol"]);
+        volume.Fail = true;
+        Assert.Equal("", provider.GetValues()["volume_symbol"]);
+    }
+
+    [Theory]
     [InlineData(0F, false, "0%", "0", "")]
     [InlineData(0.42F, false, "42%", "42", "")]
     [InlineData(1F, true, "100% (muted)", "100", "muted")]
