@@ -85,7 +85,8 @@ internal sealed class WindowManagerHost
         _workspaceVisibilitySynchronizer = new WorkspaceVisibilitySynchronizer(
             _workspaceState,
             _monitorOwnership,
-            _windowCommander);
+            _windowCommander,
+            _managementState);
         _mouseFocusController = new MouseFocusController(
             _windowCommander,
             CanFocusWithMouse,
@@ -368,9 +369,9 @@ internal sealed class WindowManagerHost
             // Do not reseed the tracker here: windows hidden for other workspaces are not
             // WS_VISIBLE, so re-inspecting them would misclassify them as NotVisible and
             // drop them from tiling/workspace state.
-            ApplyWorkspaceVisibility();
             if (_managementState.IsEnabled)
             {
+                ApplyWorkspaceVisibility();
                 RetilePrimaryWindows();
             }
         }
@@ -873,6 +874,7 @@ internal sealed class WindowManagerHost
         SaveWorkspaceState();
         ClearFloatingZOrder();
         RunUntileMode();
+        _workspaceHiddenHandles.Clear();
         _fullscreenState.Clear();
         _explorerVisibility.EnsureVisible();
         _log.Info("management_disabled", new { disabled, reason = "emergency_hotkey" });

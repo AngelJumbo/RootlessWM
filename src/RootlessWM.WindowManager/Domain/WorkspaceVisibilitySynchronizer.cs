@@ -3,11 +3,17 @@ namespace RootlessWM.Domain;
 public sealed class WorkspaceVisibilitySynchronizer(
     WorkspaceState workspaceState,
     MonitorOwnership monitorOwnership,
-    IWindowCommander windowCommander)
+    IWindowCommander windowCommander,
+    ManagementState managementState)
 {
     public void Synchronize(IReadOnlyList<nint> managedHandles)
     {
         ArgumentNullException.ThrowIfNull(managedHandles);
+
+        if (!managementState.IsEnabled)
+        {
+            return;
+        }
 
         foreach (var handle in managedHandles)
         {
