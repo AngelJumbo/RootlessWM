@@ -20,6 +20,11 @@ RootlessWM is a native Windows tiling window manager inspired by DWM, focused on
 
 Download the installer from the [GitHub Releases page](https://github.com/AngelJumbo/RootlessWM/releases).
 
+## Known issues
+
+- UAC prompts sometimes do not appear in front of other windows, requiring selection
+  from the Windows taskbar. This is intermittent; the cause has not been confirmed.
+
 ## Documentation
 
 - [Development](docs/development.md)
