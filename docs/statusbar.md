@@ -11,7 +11,7 @@ Colors use `#RRGGBB` for opaque colors or `#RRGGBBAA` for colors with alpha (`00
 | `visible` | Boolean | Enables or disables the bar across all monitors. |
 | `independent-modules` | Boolean | Default `false`. Hides the global bar background, border, rounded frame, and Windows outline/shadow; modules retain their own styling. |
 | `position` | `"top"` \| `"bottom"` \| `"left"` \| `"right"` | Which monitor edge the bar docks to. Defaults to `top`. |
-| `height` | Integer (`16`–`64`) | Reserved thickness of the bar: its height when docked `top`/`bottom`, or its width when docked `left`/`right`. `thickness` is accepted as an alias for this key. |
+| `height` | Integer (`16`–`64`) | Reserved thickness of the bar: its height when docked `top`/`bottom`, or its width when docked `left`/`right`. Expressed in logical (96-DPI) pixels and scaled by each monitor's DPI, so the bar and its reserved space stay consistent across display scales. `thickness` is accepted as an alias for this key. |
 | `background` | Hex color | Base bar background. |
 | `border` | Table (`width`, `color`) | Border thickness and color. |
 | `radius` | Integer | Corner radius in pixels. |

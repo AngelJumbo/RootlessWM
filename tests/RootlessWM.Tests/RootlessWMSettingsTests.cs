@@ -308,6 +308,34 @@ public sealed class RootlessWMSettingsTests
     }
 
     [Fact]
+    public void Reserve_WithMonitorScale_ReservesPhysicalPixels()
+    {
+        var options = new RootlessWMSettings(0, 0, WorkspaceBar: new WorkspaceBarSettings(Visible: true, Height: 24))
+            .ToWorkspaceBarOptions();
+
+        var reserved = options.Reserve(new WindowBounds(100, 200, 1600, 1200), scale: 2F);
+
+        Assert.Equal(new WindowBounds(100, 248, 1600, 1152), reserved);
+    }
+
+    [Fact]
+    public void Reserve_WithMarginAndFractionalScale_ScalesEachTermLikeTheBar()
+    {
+        var options = new RootlessWMSettings(
+            0,
+            0,
+            WorkspaceBar: new WorkspaceBarSettings(
+                Height: 28,
+                Style: new WorkspaceBarStyleSettings(MarginTop: 2, MarginBottom: 2, MarginLeft: 8, MarginRight: 8)))
+            .ToWorkspaceBarOptions();
+
+        var reserved = options.Reserve(new WindowBounds(100, 200, 1600, 1200), scale: 1.5F);
+
+        // 28 * 1.5 = 42, each 2px margin scales to 3px: 42 + 3 + 3 = 48.
+        Assert.Equal(new WindowBounds(100, 248, 1600, 1152), reserved);
+    }
+
+    [Fact]
     public void Reserve_HiddenBar_DoesNotChangeWorkArea()
     {
         var options = new RootlessWMSettings(0, 0, WorkspaceBar: new WorkspaceBarSettings(Visible: false))

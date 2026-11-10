@@ -16,7 +16,9 @@ public sealed record WorkspaceBarOptions(
 {
     public bool IsVertical => Position is WorkspaceBarPosition.Left or WorkspaceBarPosition.Right;
 
-    public WindowBounds Reserve(WindowBounds workArea)
+    // Height and margins are logical (96-DPI) values; the work area is in physical pixels, so the
+    // monitor scale converts each term the same way the bar sizes itself (per-term rounding).
+    public WindowBounds Reserve(WindowBounds workArea, float scale = 1F)
     {
         if (!Visible)
         {
@@ -24,15 +26,19 @@ public sealed record WorkspaceBarOptions(
         }
 
         var margin = Style?.Margin ?? Padding.Empty;
+        var thickness = ToPixel(Math.Max(1, Height), scale);
         return Position switch
         {
-            WorkspaceBarPosition.Top => ReserveEdge(workArea, Height + margin.Top + margin.Bottom, fromStart: true, horizontal: false),
-            WorkspaceBarPosition.Bottom => ReserveEdge(workArea, Height + margin.Top + margin.Bottom, fromStart: false, horizontal: false),
-            WorkspaceBarPosition.Left => ReserveEdge(workArea, Height + margin.Left + margin.Right, fromStart: true, horizontal: true),
-            WorkspaceBarPosition.Right => ReserveEdge(workArea, Height + margin.Left + margin.Right, fromStart: false, horizontal: true),
+            WorkspaceBarPosition.Top => ReserveEdge(workArea, thickness + ToPixel(Math.Max(0, margin.Top), scale) + ToPixel(Math.Max(0, margin.Bottom), scale), fromStart: true, horizontal: false),
+            WorkspaceBarPosition.Bottom => ReserveEdge(workArea, thickness + ToPixel(Math.Max(0, margin.Top), scale) + ToPixel(Math.Max(0, margin.Bottom), scale), fromStart: false, horizontal: false),
+            WorkspaceBarPosition.Left => ReserveEdge(workArea, thickness + ToPixel(Math.Max(0, margin.Left), scale) + ToPixel(Math.Max(0, margin.Right), scale), fromStart: true, horizontal: true),
+            WorkspaceBarPosition.Right => ReserveEdge(workArea, thickness + ToPixel(Math.Max(0, margin.Left), scale) + ToPixel(Math.Max(0, margin.Right), scale), fromStart: false, horizontal: true),
             _ => workArea
         };
     }
+
+    // Keep in sync with DpiHelper.LogicalToPixel so the reservation matches the bar's bounds.
+    private static int ToPixel(float value, float scale) => (int)MathF.Round(value * scale);
 
     private static WindowBounds ReserveEdge(WindowBounds workArea, int reserved, bool fromStart, bool horizontal)
     {

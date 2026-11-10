@@ -980,7 +980,7 @@ internal sealed class WindowManagerHost
                 var barVisible = workspaceBarOptions.Visible
                     && !_statusBarHidden.GetValueOrDefault((monitor.Handle, workspace));
                 var workArea = (workspaceBarOptions with { Visible = barVisible })
-                    .Reserve(monitor.Bounds);
+                    .Reserve(monitor.Bounds, monitor.Scale);
                 if (!workArea.IsUsable)
                 {
                     continue;

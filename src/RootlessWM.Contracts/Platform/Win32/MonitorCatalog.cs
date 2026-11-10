@@ -52,7 +52,8 @@ internal sealed class MonitorCatalog
                             monitorBounds,
                             reservedWorkArea,
                             monitorsWithVisibleTaskbars.Contains(monitor)),
-                        (monitorInfo.Flags & NativeMethods.MonitorInfofPrimary) != 0));
+                        (monitorInfo.Flags & NativeMethods.MonitorInfofPrimary) != 0,
+                        GetScale(monitor)));
                 }
 
                 return true;
@@ -65,6 +66,13 @@ internal sealed class MonitorCatalog
         }
 
         return monitors;
+    }
+
+    private static float GetScale(nint monitor)
+    {
+        return NativeMethods.GetDpiForMonitor(monitor, NativeMethods.MonitorDpiTypeEffective, out var dpiX, out _) == 0
+            ? dpiX / 96F
+            : 1F;
     }
 
     private static HashSet<nint> GetMonitorsWithVisibleTaskbars()
