@@ -109,7 +109,41 @@ internal sealed class TomlSettingsProvider
                 GetStringList(table, "Enabled"),
                 GetString(table, "Default") ?? "MasterLeft",
                 GetDouble(table, "MasterRatio") ?? 0.6,
-                (int)(GetLong(table, "MasterCount") ?? 1));
+                (int)(GetLong(table, "MasterCount") ?? 1),
+                GetAnimationEnabled(table),
+                GetAnimationDuration(table));
+    }
+
+    private static bool GetAnimationEnabled(TomlTable table)
+    {
+        if (!TryGetValue(table, "Animate", out var value))
+        {
+            return true;
+        }
+
+        return value is bool enabled
+            ? enabled
+            : throw new ArgumentOutOfRangeException("Animate", value, "Animate must be a boolean.");
+    }
+
+    private static int GetAnimationDuration(TomlTable table)
+    {
+        if (!TryGetValue(table, "AnimationDurationMs", out var value))
+        {
+            return 160;
+        }
+
+        if (value is not long duration)
+        {
+            throw new ArgumentOutOfRangeException("AnimationDurationMs", value, "Animation duration must be an integer.");
+        }
+
+        if (duration is < 1 or > 1000)
+        {
+            throw new ArgumentOutOfRangeException("AnimationDurationMs", duration, "Animation duration must be between 1 and 1000 milliseconds.");
+        }
+
+        return (int)duration;
     }
 
     private static ToggleExplorerBehaviour MapToggleExplorerBehaviour(string value)

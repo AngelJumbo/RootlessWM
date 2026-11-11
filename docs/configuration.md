@@ -23,6 +23,8 @@ All layout settings live under `[Layouts]`.
 | `default` | String | `"MasterLeft"` | Starting layout: `MasterLeft`, `MasterTop`, `Monocle`, `Floating`, `Grid`, `Fibonacci`, `Dwindle`, or `CenteredMaster`. |
 | `master-ratio` | Float (`0.05`–`0.95`) | `0.6` | Proportion of screen width assigned to the master area (`MasterLeft`/`MasterTop` only). |
 | `master-count` | Integer (`1`–`9`) | `1` | Initial number of windows allocated to the master area (`MasterLeft`/`MasterTop` only). |
+| `animate` | Boolean | `true` | Animate tiled-window layout changes; disable for immediate placement. |
+| `animation-duration-ms` | Integer (`1`–`1000`) | `160` | Duration of layout transitions in milliseconds. |
 | `enabled` | Array of strings | built-in default order | Single source of truth for `CycleLayout` / `CycleLayoutPrevious`: its order determines the cycle order, and any layout left out of the list cannot be reached by cycling (it can still be selected with a direct hotkey; see [Keybindings](keybindings.md)). |
 
 ```toml
@@ -30,6 +32,8 @@ All layout settings live under `[Layouts]`.
 default = "MasterLeft"
 master-ratio = 0.6
 master-count = 1
+animate = true
+animation-duration-ms = 160
 enabled = [
     "MasterLeft",
     "MasterTop",
@@ -44,6 +48,8 @@ enabled = [
 - An unknown layout name or a duplicate entry in `enabled` is a configuration error.
 - Omitting `[Layouts]` (or `enabled`) cycles through the built-in default order: `MasterLeft`,
   `MasterTop`, `Monocle`, `Floating`.
+- Transitions stop while a window is dragged or resized by hand. Maximized windows are restored
+  and placed immediately. Some applications may redraw unevenly while being resized.
 
 ## Related Configuration
 

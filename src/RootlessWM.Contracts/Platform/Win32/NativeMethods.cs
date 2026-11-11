@@ -15,6 +15,8 @@ internal static class NativeMethods
     internal const uint UlwAlpha = 0x00000002;
     internal const uint GwOwner = 4;
     internal const uint EventSystemForeground = 0x0003;
+    internal const uint EventSystemMoveSizeStart = 0x000A;
+    internal const uint EventSystemMoveSizeEnd = 0x000B;
     internal const uint EventObjectCreate = 0x8000;
     internal const uint EventObjectDestroy = 0x8001;
     internal const uint EventObjectShow = 0x8002;

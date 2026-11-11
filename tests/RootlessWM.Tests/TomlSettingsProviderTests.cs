@@ -8,6 +8,63 @@ namespace RootlessWM.Tests;
 
 public sealed class TomlSettingsProviderTests
 {
+    [Theory]
+    [InlineData("", true, 160)]
+    [InlineData("animate = false\nanimation-duration-ms = 250", false, 250)]
+    [InlineData("animate = true\nanimation-duration-ms = 1", true, 1)]
+    [InlineData("animation-duration-ms = 1000", true, 1000)]
+    public void Load_LayoutAnimationSettings(string values, bool enabled, int duration)
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(path, "[Layouts]\n" + values);
+            var layouts = new TomlSettingsProvider(path).Load().Layouts!;
+            Assert.Equal(enabled, layouts.Animate);
+            Assert.Equal(duration, layouts.AnimationDurationMs);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Theory]
+    [InlineData(0L)]
+    [InlineData(1001L)]
+    [InlineData(4294967456L)]
+    public void Load_RejectsInvalidAnimationDuration(long duration)
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(path, $"[Layouts]\nanimation-duration-ms = {duration}");
+            Assert.Throws<ArgumentOutOfRangeException>(() => new TomlSettingsProvider(path).Load());
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Theory]
+    [InlineData("animate = \"true\"")]
+    [InlineData("animation-duration-ms = \"160\"")]
+    [InlineData("animation-duration-ms = 1.5")]
+    public void Load_RejectsInvalidAnimationTypes(string value)
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(path, "[Layouts]\n" + value);
+            Assert.Throws<ArgumentOutOfRangeException>(() => new TomlSettingsProvider(path).Load());
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     [Fact]
     public void Load_BrightnessSymbolsForCustomModuleId()
     {

@@ -27,6 +27,7 @@ internal sealed class WindowManagerHost
     private readonly MonitorCatalog _monitorCatalog = new();
     private readonly MonitorOwnership _monitorOwnership = new();
     private readonly WindowTiler _windowTiler;
+    private readonly AnimatedWindowPlacementApplier _placementApplier;
     private readonly TilingCommandProcessor _commandProcessor;
     private readonly MonitorCommandProcessor _monitorCommandProcessor;
     private readonly WorkspaceState _workspaceState = new();
@@ -71,9 +72,16 @@ internal sealed class WindowManagerHost
     {
         _eligibilityClassifier = new WindowEligibilityClassifier(_eligibilityOptions);
         _windowTracker = new WindowTracker(_eligibilityClassifier);
-        _windowTiler = new WindowTiler(
-            new MasterStackLayout(),
-            new GuardedWindowPlacementApplier(_windowInspector, _eligibilityClassifier));
+        _placementApplier = new AnimatedWindowPlacementApplier(
+            new GuardedWindowPlacementApplier(_windowInspector, _eligibilityClassifier),
+            handle => _windowInspector.TryInspect(handle, out var candidate) ? candidate.Bounds : null,
+            NativeMethods.IsZoomed,
+            result => _log.Error("animation_placement_failed", new
+            {
+                handle = $"0x{result.Handle.ToInt64():X}",
+                result.Reason
+            }));
+        _windowTiler = new WindowTiler(new MasterStackLayout(), _placementApplier);
         _commandProcessor = new TilingCommandProcessor(_tilingState, _windowCommander);
         _monitorCommandProcessor = new MonitorCommandProcessor(
             _tilingState,
@@ -197,6 +205,7 @@ internal sealed class WindowManagerHost
 
     private void RestoreManagedWindows()
     {
+        _placementApplier.CancelAll();
         var managedWindowStates = _managedWindowStates;
 
         if (managedWindowStates.Count == 0)
@@ -321,6 +330,7 @@ internal sealed class WindowManagerHost
             if (eventArgs.Reason == SessionSwitchReason.SessionLock)
             {
                 _sessionLocked = true;
+                _placementApplier.SetSuspended(true);
                 _log.Info("session_locked");
                 return;
             }
@@ -331,6 +341,7 @@ internal sealed class WindowManagerHost
             }
 
             _sessionLocked = false;
+            _placementApplier.SetSuspended(false);
             _log.Info("session_unlocked");
             // Do not reseed the tracker here: windows hidden for other workspaces are not
             // WS_VISIBLE, so re-inspecting them would misclassify them as NotVisible and
@@ -939,6 +950,8 @@ internal sealed class WindowManagerHost
             .ToArray();
         if (failedHandles.Length == 0)
         {
+            _placementApplier.Retain(operations.SelectMany(operation => operation.PlannedPlacements)
+                .Select(placement => placement.Handle).ToHashSet());
             return operations;
         }
 
@@ -950,9 +963,12 @@ internal sealed class WindowManagerHost
 
         _tilingState.Synchronize(_windowTracker.Snapshot());
         var retryHandles = GetEligibleTiledHandles();
-        return retryHandles.Count == orderedHandles.Count
+        var result = retryHandles.Count == orderedHandles.Count
             ? operations
             : ApplyAllMonitorLayouts(retryHandles);
+        _placementApplier.Retain(result.SelectMany(operation => operation.PlannedPlacements)
+            .Select(placement => placement.Handle).ToHashSet());
+        return result;
     }
 
     private List<TilingOperationResult> ApplyAllMonitorLayouts(IReadOnlyList<nint> orderedHandles)
@@ -1056,6 +1072,15 @@ internal sealed class WindowManagerHost
     {
         var managedHandles = GetManagedHandles();
         _workspaceState.Synchronize(managedHandles, GetDefaultWorkspace);
+        foreach (var handle in managedHandles)
+        {
+            if (_monitorOwnership.TryGetMonitor(handle, out var monitorHandle)
+                && !_workspaceState.IsInCurrentWorkspace(handle, monitorHandle))
+            {
+                _placementApplier.Cancel(handle);
+            }
+        }
+
         _workspaceVisibilitySynchronizer.Synchronize(managedHandles);
         _workspaceHiddenHandles.Clear();
         foreach (var handle in managedHandles)
@@ -1154,8 +1179,21 @@ internal sealed class WindowManagerHost
                 return;
             }
 
+            if (windowEvent.Kind == WindowEventKind.MoveSizeStarted)
+            {
+                _placementApplier.BeginMoveSize(windowEvent.Handle);
+                return;
+            }
+
+            if (windowEvent.Kind == WindowEventKind.MoveSizeEnded)
+            {
+                _placementApplier.EndMoveSize(windowEvent.Handle);
+                return;
+            }
+
             if (windowEvent.Kind == WindowEventKind.Destroyed)
             {
+                _placementApplier.Cancel(windowEvent.Handle);
                 _ = _workspaceHiddenHandles.Remove(windowEvent.Handle);
                 _ = _eligibilityRecheckAttempts.Remove(windowEvent.Handle);
                 var wasTracked = _windowTracker.Remove(windowEvent.Handle);
@@ -1201,6 +1239,8 @@ internal sealed class WindowManagerHost
                 {
                     return;
                 }
+
+                _placementApplier.Cancel(windowEvent.Handle);
             }
 
             if (_windowInspector.TryInspect(windowEvent.Handle, out var candidate))
@@ -1286,6 +1326,8 @@ internal sealed class WindowManagerHost
         var result = _settingsLoader.Load();
         _settings = result.Settings;
         _layoutOptions = _settings.ToLayoutOptions();
+        var layouts = _settings.Layouts ?? LayoutsSettings.Empty;
+        _placementApplier.Configure(layouts.Animate, layouts.AnimationDurationMs);
         _eligibilityOptions.ExcludedExecutableNames.Clear();
         foreach (var executable in _settings.ExcludedExecutables ?? [])
         {

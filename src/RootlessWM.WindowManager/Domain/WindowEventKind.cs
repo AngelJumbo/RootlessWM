@@ -7,5 +7,7 @@ public enum WindowEventKind
     Shown,
     Hidden,
     Activated,
-    LocationChanged
+    LocationChanged,
+    MoveSizeStarted,
+    MoveSizeEnded
 }

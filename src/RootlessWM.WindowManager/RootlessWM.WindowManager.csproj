@@ -7,4 +7,7 @@
   <ItemGroup>
     <ProjectReference Include="..\RootlessWM.Contracts\RootlessWM.Contracts.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="RootlessWM.Tests" />
+  </ItemGroup>
 </Project>

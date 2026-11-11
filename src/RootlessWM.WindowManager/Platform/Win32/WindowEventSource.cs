@@ -35,6 +35,8 @@ internal sealed class WindowEventSource : IDisposable
         try
         {
             RegisterHook(NativeMethods.EventSystemForeground);
+            RegisterHook(NativeMethods.EventSystemMoveSizeStart);
+            RegisterHook(NativeMethods.EventSystemMoveSizeEnd);
             RegisterHook(NativeMethods.EventObjectCreate);
             RegisterHook(NativeMethods.EventObjectDestroy);
             RegisterHook(NativeMethods.EventObjectShow);
@@ -161,6 +163,8 @@ internal sealed class WindowEventSource : IDisposable
             NativeMethods.EventObjectShow => WindowEventKind.Shown,
             NativeMethods.EventObjectHide => WindowEventKind.Hidden,
             NativeMethods.EventSystemForeground => WindowEventKind.Activated,
+            NativeMethods.EventSystemMoveSizeStart => WindowEventKind.MoveSizeStarted,
+            NativeMethods.EventSystemMoveSizeEnd => WindowEventKind.MoveSizeEnded,
             NativeMethods.EventObjectLocationChange => WindowEventKind.LocationChanged,
             _ => (WindowEventKind?)null
         };

@@ -35,6 +35,9 @@ hide-explorer-on-start = false
 default = "MasterLeft"
 master-ratio = 0.6
 master-count = 1
+# Smooth layout changes; set animate = false for immediate placement.
+animate = true
+animation-duration-ms = 160 # 1-1000
 enabled = ["MasterLeft", "MasterTop", "Grid", "Fibonacci", "Dwindle", "CenteredMaster", "Monocle", "Floating"]
 
 [statusbar]
